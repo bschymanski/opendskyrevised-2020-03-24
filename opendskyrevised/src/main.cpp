@@ -46,6 +46,33 @@ auto timer = timer_create_default();
 SoftwareSerial mySoftwareSerial(5, 4); // RX, TX
 DFRobotDFPlayerMini myDFPlayer;
 
+/* Files on SD Card (have to be copied to the sdcard in exactly this order)
+Can be found here:
+https://www.nasa.gov/connect/sounds/index.html
+
+0001_Silence.mp3
+0002_Alarm.mp3
+0003_JFK_I_Believe_Short.mp3
+0004_JFK_We_Choose_Short.mp3
+0005_A8_Genesis_Short.mp3
+0006_A11_Eagle_Has_Landed_Short.mp3
+0007_A13_problem_Short.mp3
+0008_A11_Go_for_Landing.mp3
+0009_A11_Launch_to_Orbit.mp3
+0010_A12_Conrad_Bugs_Bunny.mp3
+0011_A11_One_Small_Step.mp3
+0012_A17_Strolling_Long.mp3
+0013_JFK_I_Believe_Long.mp3
+0014_JFK_We_Choose_Long.mp3
+0015_A8_Genesis_Long.mp3
+0016_A17_Orange_Soil_Short.mp3
+0017_A13_problem_Long.mp3
+0018_Quindar_Beeps.mp3
+0019_Apollo_12_Cardiac_Sim.mp3
+0020_Apollo_12_All_Weather_Testing.mp3
+0021_Quindar_Beeps-trimmed.mp3
+
+*/
 
 enum Action: int {
     none                        = 0,
@@ -1215,7 +1242,14 @@ void jfk(byte jfk)
 
 void loop() {
     timer.tick(); // toggle on / off
-
+    if (toggle == true) {
+        setLamp(white, lampClk);
+    }
+    else
+    {
+        setLamp(off, lampClk);
+    }
+    
     if (currentProgram == programJFKAudio) {
         //jfk(1);
         playTrack(19);
@@ -1295,4 +1329,4 @@ void loop() {
     //Serial.print(noun);
     //Serial.print("  ");
     //Serial.println(action);
-};
+}
