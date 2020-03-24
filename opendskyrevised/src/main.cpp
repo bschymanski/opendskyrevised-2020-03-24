@@ -751,18 +751,18 @@ void processProgramInputMode()
     {
         fresh = true;
         oldKey = keyValue;
-        Serial.print("neuer Prog Key wurde eingegeben: ");
-        Serial.println(keyValue);
-        Serial.print("prog   : "); Serial.println(currentProgram);
+        //Serial.print("neuer Prog Key wurde eingegeben: ");
+        //Serial.println(keyValue);
+        //Serial.print("prog   : "); Serial.println(currentProgram);
         if ((error == 1) && (keyValue == keyReset) && (fresh == true))
         {
             error = 0;
             turnOffLampNumber(lampOprErr);
             fresh = false;
-            Serial.print("Error = 1, Keyreset wurde gedrückt, ");
-            Serial.print("neuer Prog Key wurde eingegeben: ");
-            Serial.println(keyValue);
-            Serial.print("prog   : "); Serial.println(currentProgram);
+            //Serial.print("Error = 1, Keyreset wurde gedrückt, ");
+            //Serial.print("neuer Prog Key wurde eingegeben: ");
+            //Serial.println(keyValue);
+            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
         if ((keyValue == keyEnter) && (fresh == true)) 
         {
@@ -788,10 +788,10 @@ void processProgramInputMode()
                 error = 0;
                 newProg = true;
             }
-            Serial.print("KeyEnter wurde gedrückt, ");
-            Serial.print("neuer Prog Key wurde eingegeben: ");
-            Serial.println(keyValue);
-            Serial.print("prog   : "); Serial.println(currentProgram);
+            //Serial.print("KeyEnter wurde gedrückt, ");
+            //Serial.print("neuer Prog Key wurde eingegeben: ");
+            //Serial.println(keyValue);
+            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
         if ((keyValue == keyRelease) && (fresh == true))
         {
@@ -808,10 +808,10 @@ void processProgramInputMode()
                 setDigits(0, 2, progOld[0]);
                 setDigits(0, 3, progOld[1]);
             }
-            Serial.print("KeyRelease wurde gedrückt");
-            Serial.print("neuer Prog Key wurde eingegeben: ");
-            Serial.println(keyValue);
-            Serial.print("prog   : "); Serial.println(currentProgram);
+            //Serial.print("KeyRelease wurde gedrückt");
+            //Serial.print("neuer Prog Key wurde eingegeben: ");
+            //Serial.println(keyValue);
+            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
         if ((keyValue <= keyNumber9) && (count < 2))
         { // hier wird das neue Prog eingegeben
@@ -819,10 +819,10 @@ void processProgramInputMode()
             setDigits(0, count+2, keyValue);
             count++;
             fresh = false;
-            Serial.print("0-9 wurde gedrückt, ");
-            Serial.print("neuer Prog Key wurde eingegeben: ");
-            Serial.println(keyValue);
-            Serial.print("prog   : "); Serial.println(currentProgram);
+            //Serial.print("0-9 wurde gedrückt, ");
+            //Serial.print("neuer Prog Key wurde eingegeben: ");
+            //Serial.println(keyValue);
+            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
     }
 }
