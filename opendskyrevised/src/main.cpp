@@ -39,6 +39,9 @@ const int MPU_addr=0x69;  // I2C address of the MPU-6050
 #include <timer.h>
 auto timer = timer_create_default();
 
+#include <TinyGPS++.h>
+TinyGPSPlus gps;
+
 #include "SoftwareSerial.h"
 
 #include "DFRobotDFPlayerMini.h"
@@ -132,8 +135,7 @@ enum color: int
 };
 
 enum keyValues: int
-{
-    // symbolic references to individual keys
+{ // symbolic references to individual keys
     keyNone                 = 20,
     keyVerb                 = 10,
     keyNoun                 = 11,
@@ -157,7 +159,7 @@ enum keyValues: int
 };
 
 enum verbValues: int
-{
+{ // Verbs 0,35,16,21
     verbNone                = 0,
     verbLampTest            = 35,
     verbDisplayDecimal      = 16,
@@ -165,7 +167,7 @@ enum verbValues: int
 };
 
 enum nounValues: int 
-{
+{ // Nouns 0,17,36,37,43,68
     nounNone                = 0,
     nounIMUAttitude         = 17,
     nounClockTime           = 36,
@@ -175,7 +177,7 @@ enum nounValues: int
 };
 
 enum registerDisplayPositions: int 
-{
+{ // Display Register Positions
     register1Position       = 4,
     register2Position       = 5,
     register3Position       = 6
@@ -208,9 +210,21 @@ bool error = 0;
 bool newAction = false;
 byte audioTrack = 1;
 
+int lat = 0;
+int lon = 0;
+int alt = 0;
+
 int globaltimer=0;
 bool global_state_1sec=false;
 
+// GPS Definitions
+bool GPS_READ_STARTED = true;
+bool gpsread = true;
+bool gpsfix = false;
+
+// variables for Time display (10th of a second, 100th of a second)
+unsigned long previousMillis = 0;
+int oldSecond = 0;
 
 bool toggle_timer(void *)
 {
@@ -266,9 +280,9 @@ void setup() {
         Serial.println(F("2.Please insert the SD card!"));
     while(true);
     }
-  Serial.println(F("DFPlayer Mini online."));
-  myDFPlayer.volume(10);  //Set volume value. From 0 to 30
-  Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
+    Serial.println(F("DFPlayer Mini online."));
+    myDFPlayer.volume(10);  //Set volume value. From 0 to 30
+    Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
 }
 
 void validateAction() {
@@ -926,71 +940,89 @@ void executeLampTestModeWithDuration(int durationInMilliseconds) {
 }
 
 
-void actionReadTime() {
+void actionReadTime()
+{
     // read time from real-time clock (RTC)
     DateTime now = realTimeClock.now();
+    // 10th and hundreds of seconds
+    if( oldSecond < now.second() )
+    {
+        oldSecond = now.second();
+        previousMillis = millis();
+    }
+    int hundreds = ( ( millis()-previousMillis )/10 )%100;
+    int tenth = hundreds - (hundreds % 10);
     valueForDisplay[register1Position] = (now.hour());
     valueForDisplay[register2Position] = (now.minute());
-    valueForDisplay[register3Position] = (now.second() * 100);
+    valueForDisplay[register3Position] = ((now.second() * 100) + tenth);
     setDigits();
 }
 
-void actionReadGPS() {
-    // read GPS
-    digitalWrite(7, HIGH);
+void actionReadGPS()
+{
+//PrintMode();
+  //PrintAction();
+  if (toggle == true && gpsread == true)
+  {
+    //ALT_light_on();
+    if (gpsfix == false)
+    {
+        setLamp(yellow, lampPosition);
+    }
+    else if (gpsfix == true)
+    {
+        setLamp(white, lampPosition);
+    }
+    
+    digitalWrite(7,HIGH);
     delay(20);
-    byte data[83];
-    while (Serial.available() > 0) {
-        int x =  Serial.read();
+    gpsread = false;
+    // int index = 0;
+    Serial.begin(9600);
+    delay(30);
+    while((Serial.available()) && (GPS_READ_STARTED == true))
+    {
+      setLamp(white, lampAlt);
+      if (gps.encode(Serial.read()))
+      {
+         //setLamp(orange, lampPosition);
+         setLamp(orange, lampVel);
+         GPS_READ_STARTED = false;
+         //Serial.print("2 GPS_READ_STARTED ");Serial.println(GPS_READ_STARTED);  
+      }
     }
-    while (Serial.available() < 1) {
-        int x = 1;
+    digitalWrite(7,LOW);
+    Serial.print("lat ");Serial.println(gps.location.lat());
+    Serial.print("lon ");Serial.println(gps.location.lng());
+    Serial.print("alt ");Serial.println(gps.altitude.meters());
+    setLamp(off, lampAlt);
+    setLamp(off, lampVel);
+    if (gps.location.lat() != 0)
+    {
+        gpsfix = true;
+    } 
+    else if (gps.location.lat() == 0)
+    {
+        gpsfix = false;
     }
-    delay(6);
-    int index = 0;
-    while (Serial.available() > 0) {
-        data[index] = Serial.read();
-        delayMicroseconds(960);
-        index++;
-        if (index >= 72) {
-            index = 71;
-        }
-    }
-
-    int latitude = 0;
-    int longitude = 0;
-    int altitude = 0;
-
-    if (count < 10) {
-        count++;
-        latitude = (((data[18] - 48) * 1000) + ((data[19] -48) * 100) + ((data[20] - 48) * 10) + ((data[21] - 48)));
-        longitude = (((data[30] - 48) * 10000) + ((data[31] - 48) * 1000) + ((data[32] -48) * 100) + ((data[33] - 48) * 10) + ((data[34] - 48)));
-        altitude = (((data[52] -48) * 100) + ((data[53] - 48) * 10) + ((data[54] - 48)));
-    }
-    else {
-        count++;
-        latitude = (((data[21] - 48) * 10000) + ((data[23] - 48) * 1000) + ((data[24] -48) * 100) + ((data[25] - 48) * 10) + ((data[26] - 48)));
-        longitude = (((data[34] - 48) * 10000) + ((data[36] - 48) * 1000) + ((data[37] -48) * 100) + ((data[38] - 48) * 10) + ((data[39] - 48)));
-        altitude = (((data[52] -48) * 100) + ((data[53] - 48) * 10) + ((data[54] - 48)));
-    }
-
-    if (count > 25) {
-        count = 0;
-    }
-
-    if (data[28] != 78) {
-        latitude = ((latitude - (latitude + latitude)));
-    }
-
-    if (data[41] != 69) {
-        longitude = ((longitude - (longitude + longitude)));
-    }
-
-    valueForDisplay[register1Position] = latitude;
-    valueForDisplay[register2Position] = longitude;
-    valueForDisplay[register3Position] = altitude;
-    digitalWrite(7, LOW);
+    valueForDisplay[register1Position] = gps.location.lat()*100;
+    valueForDisplay[register2Position] = gps.location.lng()*100;
+    valueForDisplay[register3Position] = gps.altitude.meters();
+    Serial.print("gpsfix ");Serial.println(gpsfix);  
     setDigits();
+  }
+  if (toggle == false)
+  {
+     gpsread = true;
+     GPS_READ_STARTED = true;
+  }
+    
+
+//    valueForDisplay[register1Position] = latitude;
+//    valueForDisplay[register2Position] = longitude;
+//    valueForDisplay[register3Position] = altitude;
+//    digitalWrite(7, LOW);
+//    setDigits();
 }
 
 void actionSetTime() {
