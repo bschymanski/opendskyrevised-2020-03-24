@@ -992,16 +992,22 @@ void actionReadGPS()
       }
     }
     digitalWrite(7,LOW);
-    Serial.print("lat ");Serial.println(gps.location.lat());
-    Serial.print("lon ");Serial.println(gps.location.lng());
-    Serial.print("alt ");Serial.println(gps.altitude.meters());
+    Serial.print("lat        ");Serial.println(gps.location.lat(), 6);
+    Serial.print("lon        ");Serial.println(gps.location.lng(), 6);
+    Serial.print("alt        ");Serial.println(gps.altitude.meters(), 6);
+    Serial.print("age        ");Serial.println(gps.altitude.age(), 6);
+    Serial.print("is updated ");Serial.println(gps.location.isUpdated(), 6);
+    Serial.print("is valid   ");Serial.println(gps.location.isValid(), 6);
+    
     setLamp(off, lampAlt);
     setLamp(off, lampVel);
-    if (gps.location.lat() != 0)
+    //if (gps.location.lat() != 0)
+    if (gps.location.isValid() == 1)
     {
         gpsfix = true;
     } 
-    else if (gps.location.lat() == 0)
+    //else if (gps.location.lat() == 0)
+    else if (gps.location.isValid() != 1)
     {
         gpsfix = false;
     }
