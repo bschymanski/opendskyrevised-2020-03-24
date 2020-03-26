@@ -85,6 +85,8 @@ enum Action: int {
     displayRangeWith1202Error   = 4,
     setTime                     = 5,
     setDate                     = 6,
+    PlayAudioclip               = 7,
+    PlaySelectedAudioclip       = 8
 };
 
 enum Mode: int {
@@ -167,13 +169,14 @@ enum verbValues: int
 };
 
 enum nounValues: int 
-{ // Nouns 0,17,36,37,43,68
+{ // Nouns 0,17,36,37,43,68,98
     nounNone                = 0,
     nounIMUAttitude         = 17,
     nounClockTime           = 36,
     nounDate                = 37,
     nounLatLongAltitude     = 43,
-    nounRangeTgoVelocity    = 68
+    nounRangeTgoVelocity    = 68,
+    nounSelectAudioclip      = 98
 };
 
 enum registerDisplayPositions: int 
@@ -191,9 +194,11 @@ bool fresh = true;
 byte action = none;
 byte currentAction = none;
 byte verb = verbNone;
+byte verb_old = verbNone;
 byte verbNew[2];
 byte verbOld[2];
-byte noun = 0;
+byte noun = nounNone;
+byte noun_old = nounNone;
 byte nounNew[2];
 byte nounOld[2];
 byte currentProgram = programNone;
@@ -205,10 +210,14 @@ byte count = 0;
 byte mode = modeIdle;
 byte oldMode = modeIdle;
 bool toggle = false;
+bool toggle600 = false;
+bool toggle600count = false;
 byte toggleCount = 0;
 bool error = 0;
 bool newAction = false;
 byte audioTrack = 1;
+
+int clipnum = 1;
 
 int lat = 0;
 int lon = 0;
@@ -216,6 +225,7 @@ int alt = 0;
 
 int globaltimer=0;
 bool global_state_1sec=false;
+bool global_state_600msec=false;
 
 // GPS Definitions
 bool GPS_READ_STARTED = true;
@@ -226,6 +236,7 @@ bool gpsfix = false;
 unsigned long previousMillis = 0;
 int oldSecond = 0;
 
+// 1sec toogle
 bool toggle_timer(void *)
 {
   if(global_state_1sec==false){
@@ -236,6 +247,21 @@ bool toggle_timer(void *)
   {
     global_state_1sec=false;
     toggle = false;
+  }
+  return true; // repeat? true
+}
+
+// 600msec toggle
+bool toggle_timer_600(void *)
+{
+  if(global_state_600msec==false){
+    global_state_600msec=true;
+    toggle600 = true;
+  }
+  else
+  {
+    global_state_600msec=false;
+    toggle600 = false;
   }
   return true; // repeat? true
 }
@@ -266,6 +292,7 @@ void setup() {
 
     // Toggle 
     timer.every(1000, toggle_timer);
+    timer.every(600, toggle_timer_600);
 
     Serial.begin(9600);
     // DFPlayerMini initialize
@@ -285,7 +312,8 @@ void setup() {
     Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
 }
 
-void validateAction() {
+void validateAction()
+{
     if (verb == verbLampTest) {
         mode = modeLampTest;
         newAction = false;
@@ -315,6 +343,10 @@ void validateAction() {
     }
     else if ((verb == verbSetComponent) && (noun == nounDate)) {
         action = setDate;
+        newAction = false;
+    }
+    else if ((verb == verbSetComponent) && (noun == nounSelectAudioclip)) {
+        action = PlayAudioclip;
         newAction = false;
     }
     else {
@@ -440,6 +472,71 @@ void setDigits()
     }
 }
 
+void printProg(int prog)
+{  // Print the Progam PROG
+    int one = 0;
+    int ten = 0;
+    if (prog < 10)
+    {
+        ledControl.setDigit(0, 2, 0, false);
+        ledControl.setDigit(0, 3, prog, false);
+    }
+    else if (prog >= 10)
+    {   
+        one = prog % 10;
+        ten = (prog - one) / 10;
+        ledControl.setDigit(0, 2, ten, false);
+        ledControl.setDigit(0, 3, one, false);
+    }
+}
+
+void printVerb(int verb)
+{  // Print the verb VERB
+    int one = 0;
+    int ten = 0;
+    if (verb == verbNone)
+    {
+        ledControl.setRow(0,0,B00000000);
+        ledControl.setRow(0,1,B00000000);
+    }
+    else if ((verb > 0) && (verb < 10))
+    {
+        ledControl.setDigit(0, 0, 0, false);
+        ledControl.setDigit(0, 1, verb, false);
+    }
+    else if (verb >= 10)
+    {   
+        one = verb % 10;
+        ten = (verb - one) / 10;
+        ledControl.setDigit(0, 0, ten, false);
+        ledControl.setDigit(0, 1, one, false);
+    }
+}
+
+void printNoun(int noun)
+{  // Print the noun NOUN
+    int one = 0;
+    int ten = 0;
+    if (noun == nounNone)
+    {
+        ledControl.setRow(0,4,B00000000);
+        ledControl.setRow(0,5,B00000000);
+    }
+    else if ((noun > 0) && (noun < 10))
+    {
+        ledControl.setDigit(0, 4, 0, false);
+        ledControl.setDigit(0, 5, noun, false);
+    }
+    else if (noun >= 10)
+    {   
+        one = noun % 10;
+        ten = (noun - one) / 10;
+        ledControl.setDigit(0, 4, ten, false);
+        ledControl.setDigit(0, 5, one, false);
+    }
+}
+
+
 void setDigits(byte maximum, byte digit, byte value)
 {//Serial.println("setDigits(byte ...)");
     ledControl.setDigit(maximum, digit, value, false);
@@ -509,7 +606,8 @@ int readKeyboard() {
 }
 
 
-void processIdleMode() {
+void processIdleMode()
+{
     if (keyValue != oldKey) {
         fresh = true;
         oldKey = keyValue;
@@ -556,8 +654,8 @@ void processIdleMode() {
     }
 }
 
-void executeIdleMode() {
-    // no action set just reading the kb
+void executeIdleMode()
+{   // no action set just reading the kb
     if (newAction == true) {
         validateAction();
     }
@@ -688,6 +786,7 @@ void processNounInputMode()
                 && (noun != nounClockTime)
                 && (noun != nounLatLongAltitude)
                 && (noun != nounRangeTgoVelocity)
+                && (noun != nounSelectAudioclip)
                 && (noun != nounNone)) {
                 noun = ((nounOld[0] * 10) + nounOld[1]);    // restore prior noun
                 error = 1;
@@ -855,7 +954,8 @@ void executeProgramInputMode()
 //void processkeytime() {
 //}
 
-void executeLampTestModeWithDuration(int durationInMilliseconds) {
+void executeLampTestModeWithDuration(int durationInMilliseconds)
+{
     for (int index = 11; index < 18; index++) {
         // Uplink Acty, No Att, Stby, Key Rel, Opr Err, --, --
         illuminateWithRGBAndLampNumber(100, 100, 60, index);    // less blue = more white
@@ -959,9 +1059,7 @@ void actionReadTime()
 }
 
 void actionReadGPS()
-{
-//PrintMode();
-  //PrintAction();
+{ // Read GPS
   if (toggle == true && gpsread == true)
   {
     //ALT_light_on();
@@ -1031,8 +1129,8 @@ void actionReadGPS()
 //    setDigits();
 }
 
-void actionSetTime() {
-    // read & display time from hardware real-time clock (RTC)
+void actionSetTime()
+{   // read & display time from hardware real-time clock (RTC)
     DateTime now = realTimeClock.now();
     int nowYear = now.year();
     int nowMonth = now.month();
@@ -1141,7 +1239,8 @@ void actionSetTime() {
     verbOld[1] = 6;
 }
 
-void actionSetDate() {
+void actionSetDate()
+{
     byte yearToSet[4];
     byte monthToSet[2];
     byte dayToSet[2];
@@ -1173,8 +1272,85 @@ void mode11() {
 }
  */
 
+// V21 N98 read & enter & play the selected Audio Clip
+void actionSelectAudioclip()
+{   // V21 N98 read & enter & play the selected Audio Clip
+    // first print initial clipnum = 1
+    valueForDisplay[register1Position] = clipnum;
+    setDigits();
+    ledControl.clearDisplay(2);
+    ledControl.clearDisplay(3);
+    // enter can be pressed several times?
+    while (keyValue == keyEnter) {
+        keyValue = readKeyboard();
+    }
 
-void flashUplinkAndComputerActivityRandomly() {
+    while (keyValue != keyEnter)
+    { // now something else than enter has been pressed
+        Serial.println(keyValue);
+        keyValue = readKeyboard();
+        if (keyValue != oldKey)
+        {
+            oldKey = keyValue;
+            if (keyValue == keyPlus) {
+                clipnum++;
+            }
+            if (keyValue == keyMinus) {
+                clipnum--;
+            }
+            if (clipnum > 21) {
+                clipnum = 1;
+            }
+        }
+        valueForDisplay[register1Position] = clipnum;
+        setDigits();
+    }
+    action = PlaySelectedAudioclip;
+    verb = verbDisplayDecimal;
+    noun = nounSelectAudioclip;
+    setLamp(green, lampProg);
+    printProg(clipnum);
+}
+
+void playTrack(uint8_t track)
+{
+   myDFPlayer.stop();
+   delay(200);
+   myDFPlayer.play(track);
+   delay(200);
+   int file = myDFPlayer.readCurrentFileNumber();
+
+   Serial.print("Track:");Serial.println(track);
+   Serial.print("File:");Serial.println(file);
+
+   while (file != track) {
+     myDFPlayer.play(track);
+     delay(200);
+     file = myDFPlayer.readCurrentFileNumber();
+   }
+}
+
+// V16 N98 play the selected Audio Clip
+void actionPlaySelectedAudioclip(int clipnum)
+{   // V16 N98 play the selected Audio Clip
+    // first print initial clipnum = 1
+    printVerb(verb);
+    printNoun(noun);
+    playTrack(clipnum);
+    action = none;
+    verb = verbNone;
+    noun = nounNone;
+    printVerb(verb);
+    printNoun(noun);
+    setLamp(off, lampProg);
+    ledControl.clearDisplay(1);
+    ledControl.clearDisplay(2);
+    ledControl.clearDisplay(3);
+    setDigits();
+}
+
+void flashUplinkAndComputerActivityRandomly()
+{
     int randomNumber = random(10, 30);
 
     if ((randomNumber == 15) || (randomNumber == 25)) {
@@ -1198,7 +1374,8 @@ void flashUplinkAndComputerActivityRandomly() {
 
 
 
-void readIMU() {
+void readIMU()
+{
     flashUplinkAndComputerActivityRandomly();
 
     Wire.beginTransmission(MPU_addr);
@@ -1232,23 +1409,6 @@ void actionReadIMU() {
 }
 
 
-void playTrack(uint8_t track) {
-   myDFPlayer.stop();
-   delay(200);
-   myDFPlayer.play(track);
-   delay(200);
-   int file = myDFPlayer.readCurrentFileNumber();
-
-   Serial.print("Track:");Serial.println(track);
-   Serial.print("File:");Serial.println(file);
-
-   while (file != track) {
-     myDFPlayer.play(track);
-     delay(200);
-     file = myDFPlayer.readCurrentFileNumber();
-   }
-}
-
 void jfk(byte jfk)
 {
     if (audioTrack > 3) {
@@ -1278,7 +1438,8 @@ void jfk(byte jfk)
     }
 }
 
-void loop() {
+void loop()
+{
     timer.tick(); // toggle on / off
     if (toggle == true) {
         setLamp(white, lampClk);
@@ -1361,7 +1522,14 @@ void loop() {
     else if (action == setDate) {
         actionSetDate();    // V21N37 Set The Date
     }
-
+    else if (action == PlayAudioclip) 
+    {   // V21N98 Play Audio Clip
+        actionSelectAudioclip();    
+    }
+    else if (action == PlaySelectedAudioclip) 
+    {   // V16N98 Play Audio Clip
+        actionPlaySelectedAudioclip(clipnum);    
+    }
     //Serial.print(verb);
     //Serial.print("  ");
     //Serial.print(noun);
