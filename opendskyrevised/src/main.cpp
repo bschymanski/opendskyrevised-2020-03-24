@@ -216,7 +216,7 @@ byte toggleCount = 0;
 bool error = 0;
 bool newAction = false;
 byte audioTrack = 1;
-
+bool blink = false;
 int clipnum = 1;
 
 int lat = 0;
@@ -388,7 +388,7 @@ void setLamp(int color, int lampNumber)
             // Statement(s)
             break;
         case yellow:
-            neoPixels.setPixelColor(lampNumber, neoPixels.Color(100,0,0));
+            neoPixels.setPixelColor(lampNumber, neoPixels.Color(100,100,0));
             neoPixels.show();   // show the updated pixel color on the hardware
             // Statement(s)
             break;
@@ -476,7 +476,12 @@ void printProg(int prog)
 {  // Print the Progam PROG
     int one = 0;
     int ten = 0;
-    if (prog < 10)
+    if (prog == 0)
+    {
+        ledControl.setRow(0,2,B00000000);
+        ledControl.setRow(0,3,B00000000);
+    }
+    else if ((prog > 0) && (prog < 10))
     {
         ledControl.setDigit(0, 2, 0, false);
         ledControl.setDigit(0, 3, prog, false);
@@ -1482,7 +1487,16 @@ void loop()
 
     if (mode == modeIdle) {
         executeIdleMode();
-        setLamp(white, lampSTBY);
+        if (action == none)
+        {
+            setLamp(white, lampSTBY);
+            setLamp(off, lampProgCond);
+        }
+        else if (action != none)
+        {
+            setLamp(off, lampSTBY);
+            setLamp(yellow, lampProgCond);
+        }
         //setLamp(green, lampVerb);
         //setLamp(green, lampNoun);
         //setLamp(green, lampProg);
