@@ -195,9 +195,11 @@ byte action = none;
 byte currentAction = none;
 byte verb = verbNone;
 byte verb_old = verbNone;
+bool verb_error = false;
 byte verbNew[2];
 byte verbOld[2];
 byte noun = nounNone;
+bool noun_error = false;
 byte noun_old = nounNone;
 byte nounNew[2];
 byte nounOld[2];
@@ -211,13 +213,19 @@ byte mode = modeIdle;
 byte oldMode = modeIdle;
 bool toggle = false;
 bool toggle600 = false;
-bool toggle600count = false;
+byte toggle600count = 0;
 byte toggleCount = 0;
 bool error = 0;
 bool newAction = false;
 byte audioTrack = 1;
 bool blink = false;
+bool blinkverb = true;
+bool blinknoun = true;
+bool blinkprog = true;
+unsigned long blink_previousMillis = 0; 
+const long blink_interval = 600;
 int clipnum = 1;
+int clipcount = 0;
 
 int lat = 0;
 int lon = 0;
@@ -308,8 +316,9 @@ void setup() {
     while(true);
     }
     Serial.println(F("DFPlayer Mini online."));
-    myDFPlayer.volume(10);  //Set volume value. From 0 to 30
-    Serial.println(myDFPlayer.readFileCounts()); //read all file counts in SD card
+    myDFPlayer.volume(20);  //Set volume value. From 0 to 30
+    clipcount = myDFPlayer.readFileCounts();
+    Serial.println(clipcount); //read all file counts in SD card
 }
 
 void validateAction()
@@ -472,72 +481,96 @@ void setDigits()
     }
 }
 
-void printProg(int prog)
+void printProg(int prog, bool blink = false)
 {  // Print the Progam PROG
     int one = 0;
     int ten = 0;
-    if (prog == 0)
+    if (blink == false)
+    {
+        if (prog == 0)
+        {
+            ledControl.setRow(0,2,B00000000);
+            ledControl.setRow(0,3,B00000000);
+        }
+        else if ((prog > 0) && (prog < 10))
+        {
+            ledControl.setDigit(0, 2, 0, false);
+            ledControl.setDigit(0, 3, prog, false);
+        }
+        else if (prog >= 10)
+        {   
+            one = prog % 10;
+            ten = (prog - one) / 10;
+            ledControl.setDigit(0, 2, ten, false);
+            ledControl.setDigit(0, 3, one, false);
+        }
+    }
+    else if (blink == true)
     {
         ledControl.setRow(0,2,B00000000);
         ledControl.setRow(0,3,B00000000);
     }
-    else if ((prog > 0) && (prog < 10))
-    {
-        ledControl.setDigit(0, 2, 0, false);
-        ledControl.setDigit(0, 3, prog, false);
-    }
-    else if (prog >= 10)
-    {   
-        one = prog % 10;
-        ten = (prog - one) / 10;
-        ledControl.setDigit(0, 2, ten, false);
-        ledControl.setDigit(0, 3, one, false);
-    }
 }
 
-void printVerb(int verb)
+void printVerb(int verb, bool blink = false)
 {  // Print the verb VERB
     int one = 0;
     int ten = 0;
-    if (verb == verbNone)
+    if (blink == false)
+    {
+        if (verb == verbNone)
+        {
+            ledControl.setRow(0,0,B00000000);
+            ledControl.setRow(0,1,B00000000);
+        }
+        else if ((verb > 0) && (verb < 10))
+        {
+            ledControl.setDigit(0, 0, 0, false);
+            ledControl.setDigit(0, 1, verb, false);
+        }
+        else if (verb >= 10)
+        {   
+            one = verb % 10;
+            ten = (verb - one) / 10;
+            ledControl.setDigit(0, 0, ten, false);
+            ledControl.setDigit(0, 1, one, false);
+        }
+    }
+    else if (blink == true)
     {
         ledControl.setRow(0,0,B00000000);
         ledControl.setRow(0,1,B00000000);
     }
-    else if ((verb > 0) && (verb < 10))
-    {
-        ledControl.setDigit(0, 0, 0, false);
-        ledControl.setDigit(0, 1, verb, false);
-    }
-    else if (verb >= 10)
-    {   
-        one = verb % 10;
-        ten = (verb - one) / 10;
-        ledControl.setDigit(0, 0, ten, false);
-        ledControl.setDigit(0, 1, one, false);
-    }
 }
 
-void printNoun(int noun)
+void printNoun(int noun, bool blink = false)
 {  // Print the noun NOUN
     int one = 0;
     int ten = 0;
-    if (noun == nounNone)
+    if (blink == false)
+    {
+        if (noun == nounNone)
+        {
+            ledControl.setRow(0,4,B00000000);
+            ledControl.setRow(0,5,B00000000);
+        }
+        else if ((noun > 0) && (noun < 10))
+        {
+            ledControl.setDigit(0, 4, 0, false);
+            ledControl.setDigit(0, 5, noun, false);
+        }
+        else if (noun >= 10)
+        {   
+            one = noun % 10;
+            ten = (noun - one) / 10;
+            ledControl.setDigit(0, 4, ten, false);
+            ledControl.setDigit(0, 5, one, false);
+        }
+    }
+    else if (blink == true)
     {
         ledControl.setRow(0,4,B00000000);
         ledControl.setRow(0,5,B00000000);
-    }
-    else if ((noun > 0) && (noun < 10))
-    {
-        ledControl.setDigit(0, 4, 0, false);
-        ledControl.setDigit(0, 5, noun, false);
-    }
-    else if (noun >= 10)
-    {   
-        one = noun % 10;
-        ten = (noun - one) / 10;
-        ledControl.setDigit(0, 4, ten, false);
-        ledControl.setDigit(0, 5, one, false);
     }
 }
 
@@ -667,6 +700,10 @@ void executeIdleMode()
     else {
         if (error == 1) {
             flasher();
+            if (verb_error == true)
+            {
+                setLamp(orange, lampVerb);
+            }
         }
         keyValue = readKeyboard();
         processIdleMode();
@@ -691,8 +728,12 @@ void processVerbInputMode()
     else {
         fresh = true;
         oldKey = keyValue;
-        if ((error == 1) && (keyValue == keyReset) && (fresh == true)) {
-            error = 0; turnOffLampNumber(lampOprErr); fresh = false;
+        if ((error == 1) && (keyValue == keyReset) && (fresh == true))
+        {
+            error = 0; 
+            //turnOffLampNumber(lampOprErr);
+            setLamp(green, lampVerb);
+            fresh = false;
         } //resrt reeor
         if ((keyValue == keyEnter) && (fresh == true)) {
             fresh = false;
@@ -702,16 +743,19 @@ void processVerbInputMode()
                 && (verb != verbLampTest)
                 && (verb != verbNone)) {
                 error = 1;
+                verb_error = true;
                 verb = ((verbOld[0] * 10) + verbOld[1]);    // restore prior verb
             }
             else {
                 turnOffLampNumber(lampOprErr);
                 turnOffLampNumber(lampKeyRelease);
-                turnOffLampNumber(lampVerb);
+                //turnOffLampNumber(lampVerb);
+                setLamp(green, lampVerb);
                 mode = modeIdle;
                 count = 0;
                 fresh = false;
                 error = 0;
+                verb_error = false;
                 newAction = true;
             }
         }
@@ -720,7 +764,8 @@ void processVerbInputMode()
             if (keyValue == keyRelease) {
                 mode = oldMode;
                 turnOffLampNumber(lampKeyRelease);
-                turnOffLampNumber(lampVerb);
+                //turnOffLampNumber(lampVerb);
+                setLamp(green, lampVerb);
                 count = 0;
                 fresh = false;
                 if (verb == verbNone) {
@@ -734,14 +779,16 @@ void processVerbInputMode()
             }
             else if (keyValue == keyNoun) {
                 mode = modeInputNoun;
-                turnOffLampNumber(lampVerb);
+                //turnOffLampNumber(lampVerb);
+                setLamp(green, lampVerb);
                 count = 0;
                 fresh = false;
             }
             else if (keyValue == keyProceed) {
                 //program
                 mode = modeInputProgram;
-                turnOffLampNumber(lampVerb);
+                //turnOffLampNumber(lampVerb);
+                setLamp(green, lampVerb);
                 count = 0;
                 fresh = false;
             }
@@ -760,7 +807,8 @@ void processVerbInputMode()
 void executeVerbInputMode()
 {
     // inputting the verb
-    illuminateWithRGBAndLampNumber(0, 150, 0, lampVerb);
+    //illuminateWithRGBAndLampNumber(0, 150, 0, lampVerb);
+    setLamp(yellow, lampVerb);
     toggleKeyReleaseLamp();
     if (error == 1) {
         flasher();
@@ -1292,7 +1340,28 @@ void actionSelectAudioclip()
 
     while (keyValue != keyEnter)
     { // now something else than enter has been pressed
-        Serial.println(keyValue);
+        unsigned long blink_currentMillis = millis();
+        if (blink_currentMillis - blink_previousMillis >= blink_interval)
+        {
+            // save the last time you blinked the LED
+            blink_previousMillis = blink_currentMillis;
+            // if the LED is off turn it on and vice-versa:
+
+            if (blink == true)
+            {
+                blink = false;
+            } else {
+                blink = true;
+            }
+            printVerb(verb, blink);
+            printNoun(noun, blink);
+        }
+        // set the LED with the ledState of the variable:
+        //Serial.print("verb      : "); Serial.println(verb);
+        //Serial.print("blink     : "); Serial.println(blink);
+        //Serial.print("toggle600 : "); Serial.println(toggle600);
+        //Serial.print("blinkverb : "); Serial.println(blinkverb);
+        //Serial.println(keyValue);
         keyValue = readKeyboard();
         if (keyValue != oldKey)
         {
@@ -1303,8 +1372,11 @@ void actionSelectAudioclip()
             if (keyValue == keyMinus) {
                 clipnum--;
             }
-            if (clipnum > 21) {
+            if (clipnum > clipcount) {
                 clipnum = 1;
+            }
+            if (clipnum < 1) {
+                clipnum = clipcount;
             }
         }
         valueForDisplay[register1Position] = clipnum;
@@ -1339,13 +1411,13 @@ void playTrack(uint8_t track)
 void actionPlaySelectedAudioclip(int clipnum)
 {   // V16 N98 play the selected Audio Clip
     // first print initial clipnum = 1
-    printVerb(verb);
+    printVerb(verb, false);
     printNoun(noun);
     playTrack(clipnum);
     action = none;
     verb = verbNone;
     noun = nounNone;
-    printVerb(verb);
+    printVerb(verb, false);
     printNoun(noun);
     setLamp(off, lampProg);
     ledControl.clearDisplay(1);
