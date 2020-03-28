@@ -196,12 +196,14 @@ byte action = none;
 byte currentAction = none;
 byte verb = verbNone;
 byte verb_old = verbNone;
+byte verb_old2 = verbNone;
 bool verb_error = false;
 byte verbNew[2];
 byte verbOld[2];
 byte noun = nounNone;
 bool noun_error = false;
 byte noun_old = nounNone;
+byte noun_old2 = nounNone;
 byte nounNew[2];
 byte nounOld[2];
 byte currentProgram = programNone;
@@ -326,6 +328,7 @@ void validateAction()
 {
     if (verb == verbLampTest) {
         mode = modeLampTest;
+        //noun = noun_old;
         newAction = false;
     }
     else if ((verb == verbDisplayDecimal) && (noun == nounIMUAttitude)) {
@@ -753,11 +756,18 @@ void processVerbInputMode()
         if ((keyValue == keyEnter) && (fresh == true)) {
             fresh = false;
             //das vorherige verb in verb_old speichern, mann weiss ja nie
+            Serial.println("Verbinput mode");
+            verb_old2 = verb_old;
             verb_old = verb;
             verb = ((verbNew[0] * 10) + (verbNew[1]));
+            Serial.print("verb_old2 : "); Serial.println(verb_old2);
+            Serial.print("verb_old  : "); Serial.println(verb_old);
+            Serial.print("verb      : "); Serial.println(verb);
             if (verb != verb_old)
             {
                 // es wurde ein neues Verb eingegeben, daher muss noun auf 0 gesetzt werden
+                noun_old2 = noun_old;
+                noun_old = noun;
                 noun = 0;
                 printNoun(noun);
             }
@@ -863,8 +873,13 @@ void processNounInputMode()
 
         if ((keyValue == keyEnter) && (fresh == true)) {
             fresh = false;
+            noun_old2 = noun_old;
             noun_old = noun;
             noun = ((nounNew[0] * 10) + (nounNew[1]));
+            Serial.println("ProcNounInput");
+            Serial.print("noun_old2 : "); Serial.println(noun_old2);
+            Serial.print("noun_old  : "); Serial.println(noun_old);
+            Serial.print("noun      : "); Serial.println(noun);
             fresh = false;
             if ((noun != nounIMUAttitude)
                 && (noun != nounClockTime)
@@ -898,12 +913,14 @@ void processNounInputMode()
             fresh = false;
             if (noun == 0) {
                 //verb
-                ledControl.setRow(0, 4, 0);
-                ledControl.setRow(0, 5, 0);
+                printNoun(off, noun);
+                //ledControl.setRow(0, 4, 0);
+                //ledControl.setRow(0, 5, 0);
             }
             else {
-                setDigits(0, 4, nounOld[0]);
-                setDigits(0, 5, nounOld[1]);
+                printNoun(green, noun);
+                //setDigits(0, 4, nounOld[0]);
+                //setDigits(0, 5, nounOld[1]);
             }
         }
         if ((keyValue == keyVerb) && (fresh == true)) {
@@ -1045,16 +1062,19 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
 {
     for (int index = 11; index < 18; index++) {
         // Uplink Acty, No Att, Stby, Key Rel, Opr Err, --, --
+        delay(200);
         illuminateWithRGBAndLampNumber(100, 100, 60, index);    // less blue = more white
     }
 
     for (int index = 4; index < 11; index++) {
         // Temp, Gimbal Loc, Prog, Restart, Tracker, Alt, Vel
+        delay(200);
         illuminateWithRGBAndLampNumber(120, 110, 0, index);     // more yellow
     }
 
     for (int lampNumber = 0; lampNumber < 4; lampNumber++) {
         // Comp Acty, Prog, Verb, Noun
+        delay(200);
         illuminateWithRGBAndLampNumber(0, 150, 0, lampNumber);
     }
 
@@ -1068,6 +1088,7 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
         // ... each has six positions
         // note: 'digit' # 0 in the three registers is the plus/minus sign
         for (int digitPosition = 0; digitPosition < 6; digitPosition++) {
+            delay(200);
             setDigits(row, digitPosition, lampTestDigitValue);
         }
     }
@@ -1076,51 +1097,56 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
 
     // reset all lamps
     for (int index = 0; index < 4; index++) {
+        delay(200);
         turnOffLampNumber(index);
     }
     for (int index = 4; index < 11; index++) {
+        delay(200);
         turnOffLampNumber(index);
     }
     for (int index = 11; index < 18; index++) {
+        delay(200);
         turnOffLampNumber(index);
     }
     for (int index = 0; index < 4; index++) {
+        delay(200);
         ledControl.clearDisplay(index);
     }
 
     // restore previously-displayed values for Verb and Noun
-    verbNew[0] = verbOld[0];
-    verbNew[1] = verbOld[1];
-
+    setLamp(green, lampVerb);
+    setLamp(green, lampNoun);
+    setLamp(green, lampProg);
+    Serial.println("Lamptest V35");
+    Serial.print("verb_old2 : "); Serial.println(verb_old2);
+    Serial.print("verb_old  : "); Serial.println(verb_old);
+    Serial.print("verb      : "); Serial.println(verb);
+    Serial.print("noun_old2 : "); Serial.println(noun_old2);
+    Serial.print("noun_old  : "); Serial.println(noun_old);
+    Serial.print("noun      : "); Serial.println(noun);
     // blank Verb readout if needed
-    verb = ((verbOld[0] * 10) + verbOld[1]);
-    if (verb == verbNone) {
-        ledControl.setRow(0, 0, 0); ledControl.setRow(0, 1, 0);
-    }
-    else {
-        setDigits(0, 0, verbOld[0]);
-        setDigits(0, 1, verbOld[1]);
-    }
-
+    //verb = ((verbOld[0] * 10) + verbOld[1]);
+    verb = verb_old;
+    Serial.println("Lamptest V35 verb = verb_old");
+    Serial.print("verb_old2 : "); Serial.println(verb_old2);
+    Serial.print("verb_old  : "); Serial.println(verb_old);
+    Serial.print("verb      : "); Serial.println(verb);
+    Serial.print("noun_old2 : "); Serial.println(noun_old2);
+    Serial.print("noun_old  : "); Serial.println(noun_old);
+    Serial.print("noun      : "); Serial.println(noun);
+    printVerb(verb);
+    
     // blank Prog readout if needed
-    if (currentProgram == programNone) {
-        ledControl.setRow(0, 2, 0);
-        ledControl.setRow(0, 3, 0);
-    }
-    else {
-        setDigits(0, 0, progNew[0]);
-        setDigits(0, 1, progNew[1]);
-    }
-
-    // blank Noun readout if needed
-    if (noun == 0) {
-        ledControl.setRow(0, 4, 0);
-        ledControl.setRow(0, 5, 0);
-    }
-    else {
-        setDigits(0, 4, nounNew[0]);
-        setDigits(0, 5, nounNew[1]);
-    }
+    printProg(prog);
+    noun = noun_old;
+    Serial.println("Lamptest V35 noun = noun_old");
+    Serial.print("verb_old2 : "); Serial.println(verb_old2);
+    Serial.print("verb_old  : "); Serial.println(verb_old);
+    Serial.print("verb      : "); Serial.println(verb);
+    Serial.print("noun_old2 : "); Serial.println(noun_old2);
+    Serial.print("noun_old  : "); Serial.println(noun_old);
+    Serial.print("noun      : "); Serial.println(noun);
+    printNoun(noun);
     keyValue = keyNone;
     mode = modeIdle;
     validateAction();
@@ -1596,12 +1622,12 @@ void loop()
         if (action == none)
         {
             setLamp(white, lampSTBY);
-            setLamp(off, lampProgCond);
+            //setLamp(off, lampProgCond);
         }
         else if (action != none)
         {
             setLamp(off, lampSTBY);
-            setLamp(yellow, lampProgCond);
+            //setLamp(yellow, lampProgCond);
         }
         //setLamp(green, lampVerb);
         //setLamp(green, lampNoun);
@@ -1624,7 +1650,8 @@ void loop()
         //setLamp(orange, lampProg);
     }
     else if (mode == modeLampTest) {
-        executeLampTestModeWithDuration(5000);
+        setLamp(off, lampSTBY);
+        executeLampTestModeWithDuration(2000);
     }
     
     if (action == displayIMUAttitude) {
