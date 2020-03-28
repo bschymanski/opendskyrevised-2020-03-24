@@ -133,7 +133,8 @@ enum color: int
     yellow                  = 3,
     orange                  = 4,
     blue                    = 5,
-    off                     = 6
+    red                     = 6,
+    off                     = 7
 };
 
 enum keyValues: int
@@ -382,7 +383,8 @@ void setLamp(int color, int lampNumber)
         yellow                  = 3,
         orange                  = 4,
         blue                    = 5,
-        off                     = 6
+        red                     = 6,
+        off                     = 7
     */
     switch (color)
     {
@@ -408,6 +410,11 @@ void setLamp(int color, int lampNumber)
             break;
         case blue:
             neoPixels.setPixelColor(lampNumber, neoPixels.Color(0,0,100));
+            neoPixels.show();   // show the updated pixel color on the hardware
+            // Statement(s)
+            break;
+        case red:
+            neoPixels.setPixelColor(lampNumber, neoPixels.Color(100,0,0));
             neoPixels.show();   // show the updated pixel color on the hardware
             // Statement(s)
             break;
@@ -581,6 +588,14 @@ void setDigits(byte maximum, byte digit, byte value)
 }
 
 void flasher() {
+    if (verb_error == true)
+    {
+        setLamp(orange, lampVerb);
+    }
+    if (noun_error == true)
+    {
+        setLamp(orange, lampNoun);
+    }
     if (toggle == false) {
         illuminateWithRGBAndLampNumber(100, 100, 100, lampOprErr);
     } else {
@@ -700,10 +715,6 @@ void executeIdleMode()
     else {
         if (error == 1) {
             flasher();
-            if (verb_error == true)
-            {
-                setLamp(orange, lampVerb);
-            }
         }
         keyValue = readKeyboard();
         processIdleMode();
@@ -731,13 +742,27 @@ void processVerbInputMode()
         if ((error == 1) && (keyValue == keyReset) && (fresh == true))
         {
             error = 0; 
+            verb_error = false;
             //turnOffLampNumber(lampOprErr);
             setLamp(green, lampVerb);
+            ledControl.setRow(0,0,0);
+            ledControl.setRow(0,1,0);
+            //verb = ((verbOld[0] * 10) + verbOld[1]);
             fresh = false;
         } //resrt reeor
         if ((keyValue == keyEnter) && (fresh == true)) {
             fresh = false;
+            //das vorherige verb in verb_old speichern, mann weiss ja nie
+            verb_old = verb;
             verb = ((verbNew[0] * 10) + (verbNew[1]));
+            if (verb != verb_old)
+            {
+                // es wurde ein neues Verb eingegeben, daher muss noun auf 0 gesetzt werden
+                noun = 0;
+                printNoun(noun);
+            }
+            // wenn das neue Verb ein anderes als das neue Verb is, dann muss noun auf 0 gesetzt werden
+
             if ((verb != verbDisplayDecimal)
                 && (verb != verbSetComponent)
                 && (verb != verbLampTest)
@@ -745,6 +770,7 @@ void processVerbInputMode()
                 error = 1;
                 verb_error = true;
                 verb = ((verbOld[0] * 10) + verbOld[1]);    // restore prior verb
+                setLamp(green, lampVerb);
             }
             else {
                 turnOffLampNumber(lampOprErr);
@@ -827,12 +853,17 @@ void processNounInputMode()
         oldKey = keyValue;
         if ((error == 1) && (keyValue == keyReset) && (fresh == true)) {
             error = 0;
+            noun_error = false;
+            setLamp(green, lampNoun);
+            ledControl.setRow(0,4,0);
+            ledControl.setRow(0,5,0);
             turnOffLampNumber(lampOprErr);
             fresh = false;
         } //resrt reeor
 
         if ((keyValue == keyEnter) && (fresh == true)) {
             fresh = false;
+            noun_old = noun;
             noun = ((nounNew[0] * 10) + (nounNew[1]));
             fresh = false;
             if ((noun != nounIMUAttitude)
@@ -843,15 +874,18 @@ void processNounInputMode()
                 && (noun != nounNone)) {
                 noun = ((nounOld[0] * 10) + nounOld[1]);    // restore prior noun
                 error = 1;
+                noun_error = true;
+                setLamp(green, lampNoun);
             }
             else {
                 turnOffLampNumber(lampOprErr);
                 turnOffLampNumber(lampKeyRelease);
-                turnOffLampNumber(lampNoun);
+                setLamp(green, lampNoun);
                 mode = modeIdle;
                 count = 0;
                 fresh = false;
                 error = 0;
+                noun_error = false;
                 newAction = true;
             }
         }
@@ -859,7 +893,7 @@ void processNounInputMode()
         if ((keyValue == keyRelease) && (fresh == true)) {
             mode = oldMode;
             turnOffLampNumber(lampKeyRelease);
-            turnOffLampNumber(lampNoun);
+            setLamp(green, lampNoun);
             count = 0;
             fresh = false;
             if (noun == 0) {
@@ -875,13 +909,13 @@ void processNounInputMode()
         if ((keyValue == keyVerb) && (fresh == true)) {
             //verb
             mode = modeInputVerb;
-            turnOffLampNumber(lampNoun);
+            setLamp(green, lampNoun);
             count = 0;
             fresh = false;
         }
         if ((keyValue == keyProceed) && (fresh == true)) {
             mode = modeInputProgram;
-            turnOffLampNumber(lampNoun);
+            setLamp(green, lampNoun);
             count = 0;
             fresh = false;
             //program
@@ -898,7 +932,7 @@ void processNounInputMode()
 
 void executeNounInputMode()
 { // inputting the noun
-    illuminateWithRGBAndLampNumber(0, 150, 0, lampNoun);
+    setLamp(yellow, lampNoun);
     toggleKeyReleaseLamp();
     if (error == 1) {
         flasher();
@@ -1126,11 +1160,11 @@ void actionReadGPS()
     }
     
     digitalWrite(7,HIGH);
-    delay(20);
+    delay(100);
     gpsread = false;
     // int index = 0;
     Serial.begin(9600);
-    delay(30);
+    delay(200);
     while((Serial.available()) && (GPS_READ_STARTED == true))
     {
       setLamp(white, lampAlt);
