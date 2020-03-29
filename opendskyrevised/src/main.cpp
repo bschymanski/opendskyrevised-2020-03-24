@@ -86,7 +86,8 @@ enum Action: int {
     setTime                     = 5,
     setDate                     = 6,
     PlayAudioclip               = 7,
-    PlaySelectedAudioclip       = 8
+    PlaySelectedAudioclip       = 8,
+    displayIMUGyro              = 9
 };
 
 enum Mode: int {
@@ -173,6 +174,7 @@ enum nounValues: int
 { // Nouns 0,17,36,37,43,68,98
     nounNone                = 0,
     nounIMUAttitude         = 17,
+    nounIMUgyro             = 18,
     nounClockTime           = 36,
     nounDate                = 37,
     nounLatLongAltitude     = 43,
@@ -185,6 +187,13 @@ enum registerDisplayPositions: int
     register1Position       = 4,
     register2Position       = 5,
     register3Position       = 6
+};
+
+
+enum imumode: int
+{ // imumode Gyro or Accelration
+    Gyro                    = 1,
+    Accel                   = 0
 };
 
 long valueForDisplay[7];
@@ -234,6 +243,22 @@ int lat = 0;
 int lon = 0;
 int alt = 0;
 
+// IMU https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
+const int ACCEL_OFFSET   = 200;
+const int GYRO_OFFSET    = 151;  // 151
+const int GYRO_SENSITITY = 131;  // 131 is sensivity of gyro from data sheet
+const float GYRO_SCALE   = 0.2; //  0.02 by default - tweak as required
+const float GYRO_TEMP_DRIFT   = 0.02; //  0.02 by default - tweak as required
+const int GYRO_GRANGE = 2; // Gforce Range
+const int ACCEL_SCALE = 16384; // Scalefactor of Accelerometer
+const float LOOP_TIME    = 0.15; // 0.1 = 100ms
+const int GYRO_OFFSET_X = 2; // change this to your system until gyroCorrX displays 0 if the DSKY sits still
+const int GYRO_OFFSET_Y = 0; // change this to your system until gyroCorrY displays 0 if the DSKY sits still
+const int GYRO_OFFSET_Z = 0; // change this to your system until gyroCorrZ displays 0 if the DSKY sits still
+const int ACC_OFFSET_X = 2; // change this to your system until accAngleX displays 0 if the DSKY sits still
+const int ACC_OFFSET_Y = 3; // change this to your system until accAngleY displays 0 if the DSKY sits still
+const int ACC_OFFSET_Z = 0;  // change this to your system until accAngleZ displays 0 if the DSKY sits still
+
 int globaltimer=0;
 bool global_state_1sec=false;
 bool global_state_600msec=false;
@@ -277,52 +302,6 @@ bool toggle_timer_600(void *)
   return true; // repeat? true
 }
 
-void setup() {
-    pinMode(A0, INPUT);
-    pinMode(A1, INPUT);
-    pinMode(A2, INPUT);
-    pinMode(A7, INPUT);
-    pinMode(7, OUTPUT);
-    digitalWrite(7, LOW);
-    randomSeed(analogRead(A7));
-    neoPixels.begin();
-
-    for (int index = 0; index < 4; index++) {
-        ledControl.shutdown(index,false);
-        ledControl.setIntensity(index, 8);
-        ledControl.clearDisplay(index);
-    }
-
-    Wire.begin();
-    Wire.beginTransmission(MPU_addr);
-    Wire.write(0x6B);  // PWR_MGMT_1 register
-    Wire.write(0);     // set to zero (wakes up the MPU-6050)
-    Wire.endTransmission(true);
-
-    realTimeClock.begin();
-
-    // Toggle 
-    timer.every(1000, toggle_timer);
-    timer.every(600, toggle_timer_600);
-
-    Serial.begin(9600);
-    // DFPlayerMini initialize
-    mySoftwareSerial.begin(9600);
-    Serial.println();
-    Serial.println(F("DFRobot DFPlayer Mini Demo"));
-    Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
-    if (!myDFPlayer.begin(mySoftwareSerial))
-    {  //Use softwareSerial to communicate with mp3.
-        Serial.println(F("Unable to begin:"));
-        Serial.println(F("1.Please recheck the connection!"));
-        Serial.println(F("2.Please insert the SD card!"));
-    while(true);
-    }
-    Serial.println(F("DFPlayer Mini online."));
-    myDFPlayer.volume(20);  //Set volume value. From 0 to 30
-    clipcount = myDFPlayer.readFileCounts();
-    Serial.println(clipcount); //read all file counts in SD card
-}
 
 void validateAction()
 {
@@ -333,6 +312,10 @@ void validateAction()
     }
     else if ((verb == verbDisplayDecimal) && (noun == nounIMUAttitude)) {
         action = displayIMUAttitude;
+        newAction = false;
+    }
+    else if ((verb == verbDisplayDecimal) && (noun == nounIMUgyro)) {
+        action = displayIMUGyro;
         newAction = false;
     }
     else if ((verb == verbDisplayDecimal) && (noun == nounClockTime)) {
@@ -590,7 +573,8 @@ void setDigits(byte maximum, byte digit, byte value)
     ledControl.setDigit(maximum, digit, value, false);
 }
 
-void flasher() {
+void flasher()
+{
     if (verb_error == true)
     {
         setLamp(orange, lampVerb);
@@ -882,6 +866,7 @@ void processNounInputMode()
             Serial.print("noun      : "); Serial.println(noun);
             fresh = false;
             if ((noun != nounIMUAttitude)
+                && (noun != nounIMUgyro)
                 && (noun != nounClockTime)
                 && (noun != nounLatLongAltitude)
                 && (noun != nounRangeTgoVelocity)
@@ -1152,6 +1137,69 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
     validateAction();
 }
 
+void startupsequence(int durationInMilliseconds)
+{
+    for (int index = 11; index < 18; index++) {
+        // Uplink Acty, No Att, Stby, Key Rel, Opr Err, --, --
+        delay(50);
+        illuminateWithRGBAndLampNumber(100, 100, 60, index);    // less blue = more white
+    }
+
+    for (int index = 4; index < 11; index++) {
+        // Temp, Gimbal Loc, Prog, Restart, Tracker, Alt, Vel
+        delay(50);
+        illuminateWithRGBAndLampNumber(120, 110, 0, index);     // more yellow
+    }
+
+    for (int lampNumber = 0; lampNumber < 4; lampNumber++) {
+        // Comp Acty, Prog, Verb, Noun
+        delay(50);
+        illuminateWithRGBAndLampNumber(0, 150, 0, lampNumber);
+    }
+
+    int lampTestDigitValue = 8;
+    // passes number "8" to all the 7-segment numeric displays
+    for (int row = 0; row < 4; row++) {
+        // row 0 = Prog/Verb/Noun
+        // row 1 = Register 1
+        // row 2 = Register 2
+        // row 3 = Register 3
+        // ... each has six positions
+        // note: 'digit' # 0 in the three registers is the plus/minus sign
+        for (int digitPosition = 0; digitPosition < 6; digitPosition++) {
+            delay(50);
+            setDigits(row, digitPosition, lampTestDigitValue);
+        }
+    }
+
+    delay(durationInMilliseconds);
+
+    // reset all lamps
+    for (int index = 0; index < 4; index++) {
+        delay(50);
+        turnOffLampNumber(index);
+    }
+    for (int index = 4; index < 11; index++) {
+        delay(50);
+        turnOffLampNumber(index);
+    }
+    for (int index = 11; index < 18; index++) {
+        delay(50);
+        turnOffLampNumber(index);
+    }
+    for (int index = 0; index < 4; index++) {
+        delay(50);
+        ledControl.clearDisplay(index);
+    }
+
+    // restore previously-displayed values for Verb and Noun
+    setLamp(green, lampVerb);
+    setLamp(green, lampNoun);
+    setLamp(green, lampProg);
+    keyValue = keyNone;
+    mode = modeIdle;
+    
+}
 
 void actionReadTime()
 {
@@ -1511,38 +1559,130 @@ void flashUplinkAndComputerActivityRandomly()
 
 
 
-void readIMU()
-{
+void readIMU(int imumode)
+{  // reads the IMU Values mode Gyro or Accel
     flashUplinkAndComputerActivityRandomly();
 
+    /* 
+    https://elektro.turanis.de/html/prj075/index.html
+    https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
+    const int ACCEL_OFFSET   = 200;
+    const int GYRO_OFFSET    = 151;  // 151
+    const int GYRO_SENSITITY = 131;  // 131 is sensivity of gyro from data sheet
+    const float GYRO_SCALE   = 2; //  0.02 by default - tweak as required
+    const float LOOP_TIME    = 0.15; // 0.1 = 100ms
+    */
     Wire.beginTransmission(MPU_addr);
     Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
     Wire.endTransmission(false);
     Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
 
-    valueForDisplay[0] = (Wire.read() << 8) | Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-    valueForDisplay[1] = (Wire.read() << 8) | Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-    valueForDisplay[2] = (Wire.read() << 8) | Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-    valueForDisplay[3] = (Wire.read() << 8) | Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-    valueForDisplay[register1Position] = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-    valueForDisplay[register2Position] = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-    valueForDisplay[register3Position] = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-    valueForDisplay[3] = (valueForDisplay[3] / 340.00 + 36.53); //equation for temperature in degrees C from datasheet
 
-    /* Serial.print("AcX = "); Serial.print(valueForDisplay[0]);
-     Serial.print(" | AcY = "); Serial.print(valueForDisplay[1]);
-     Serial.print(" | AcZ = "); Serial.print(valueForDisplay[2]);
-     Serial.print(" | Tmp = "); Serial.print(valueForDisplay[3]);
-     Serial.print(" | GyX = "); Serial.print(valueForDisplay[4]);
-     Serial.print(" | GyY = "); Serial.print(valueForDisplay[5]);
-     Serial.print(" | GyZ = "); Serial.println(valueForDisplay[6]);
-     */
+    int accValueX = 0;
+    int accValueY = 0;
+    int accValueZ = 0;
+    int accCorrX = 0;
+    int accCorrY = 0;
+    int accCorrZ = 0;
+    float accAngleX = 0.0;
+    float accAngleY = 0.0;
+    float accAngleZ = 0.0;
+    int temp = 0;
+    int gyroValueX = 0;
+    int gyroValueY = 0;
+    int gyroValueZ = 0;
+    float gyroAngleX = 0.0;
+    float gyroAngleY = 0.0;
+    float gyroAngleZ = 0.0; 
+    float gyroCorrX = 0.0;
+    float gyroCorrY = 0.0;
+    float gyroCorrZ = 0.0;
+   
+    accValueX = (Wire.read() << 8) | Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+    accValueY = (Wire.read() << 8) | Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+    accValueZ = (Wire.read() << 8) | Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+    temp = (Wire.read() << 8) | Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+    gyroValueX = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+    gyroValueY = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+    gyroValueZ = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+    //valueForDisplay[register1Position] = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+    //valueForDisplay[register2Position] = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+    //valueForDisplay[register3Position] = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+    
+    temp = (temp / 340.00 + 36.53); //equation for temperature in degrees C from datasheet
+    
+    
+    accCorrX = accValueX - ACCEL_OFFSET;
+    //accCorrX = map(accCorrX, -16800, 16800, -90, 90); //ACCEL_SCALE
+    accCorrX = map(accCorrX, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+    accAngleX = constrain(accCorrX, -90, 90);
+    // our IMU sits upside down in the DSKY, so we have to flip the angle
+    accAngleX = -accAngleX;
+    accAngleX = accAngleX + ACC_OFFSET_X;
 
+    accCorrY = accValueY - ACCEL_OFFSET;
+    accCorrY = map(accCorrY, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+    accAngleY = constrain(accCorrY, -90, 90);
+    accAngleY = accAngleY + ACC_OFFSET_Y;
+
+    accCorrZ = accValueZ - ACCEL_OFFSET;
+    accCorrZ = map(accCorrZ, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+    accAngleZ = constrain(accCorrZ, -90, 90);
+    // our IMU sits upside down in the DSKY, so we have to flip the angle
+    accAngleZ = -accAngleZ;
+    accAngleZ = accAngleZ + ACC_OFFSET_Z;
+
+    gyroCorrX = (float)((gyroValueX/GYRO_SENSITITY)+GYRO_OFFSET_X);
+    gyroAngleX = (gyroCorrX * GYRO_GRANGE) * -LOOP_TIME;
+
+    gyroCorrY = (float)((gyroValueY/GYRO_SENSITITY)+GYRO_OFFSET_Y);
+    gyroAngleY = (gyroCorrY * GYRO_GRANGE) * -LOOP_TIME;
+
+    gyroCorrZ = (float)((gyroValueZ/GYRO_SENSITITY)+GYRO_OFFSET_Z);
+    gyroAngleZ = (gyroCorrZ * GYRO_GRANGE) * -LOOP_TIME;
+
+    if (imumode == Gyro)
+    {
+        valueForDisplay[register1Position] = int(gyroAngleX*100);
+        valueForDisplay[register2Position] = int(gyroAngleY*100);
+        valueForDisplay[register3Position] = int(gyroAngleZ*100);
+    }
+    else if (imumode == Accel)
+    {
+        valueForDisplay[register1Position] = int(accAngleX*100);
+        valueForDisplay[register2Position] = int(accAngleY*100);
+        valueForDisplay[register3Position] = int(accAngleZ*100);
+    }
+    
+    
+    //Serial.println("Gyrowerte:");
+    /*Serial.print("gyroValueX = ");    Serial.print(gyroValueX);
+    Serial.print(" gyroValueY = ");   Serial.print(gyroValueY);
+    Serial.print(" gyroValueZ = ");   Serial.print(gyroValueZ);
+    Serial.print(" gyroCorrX = ");     Serial.print(gyroCorrX);
+    Serial.print(" gyroCorrY = ");    Serial.print(gyroCorrY);
+    Serial.print(" gyroCorrZ = ");    Serial.print(gyroCorrZ);
+    Serial.print(" gyroAngleX = ");   Serial.print(gyroAngleX);
+    Serial.print(" gyroAngleY = ");   Serial.print(gyroAngleY);
+    Serial.print(" gyroAngleZ = "); Serial.println(gyroAngleZ);
+    Serial.println("");
+    Serial.print("accValueX = ");    Serial.print(accValueX);
+    Serial.print(" accValueY = ");   Serial.print(accValueY);
+    Serial.print(" accValueZ = ");   Serial.print(accValueZ);
+    Serial.print(" accCorrX = ");     Serial.print(accCorrX);
+    Serial.print(" accCorrY = ");     Serial.print(accCorrY);
+    Serial.print(" accelCorrZ = ");   Serial.print(accCorrZ);
+    Serial.print(" accAngleX = ");   Serial.print(accAngleX);
+    Serial.print(" accAngleY = ");   Serial.print(accAngleY);
+    Serial.print(" accAngleZ = "); Serial.print(accAngleZ);
+    Serial.print(" Temp = "); Serial.println(temp*100);
+    */
     setDigits();
+    //delay(1000);
 }
 
-void actionReadIMU() {
-    readIMU();
+void actionReadIMU(int imumode) {
+    readIMU(imumode);
 }
 
 
@@ -1573,6 +1713,55 @@ void jfk(byte jfk)
       ledControl.setRow(0, 2, 0);
       ledControl.setRow(0, 3, 0);
     }
+}
+
+void setup()
+{
+    pinMode(A0, INPUT);
+    pinMode(A1, INPUT);
+    pinMode(A2, INPUT);
+    pinMode(A7, INPUT);
+    pinMode(7, OUTPUT);
+    digitalWrite(7, LOW);
+    randomSeed(analogRead(A7));
+    neoPixels.begin();
+
+    for (int index = 0; index < 4; index++) {
+        ledControl.shutdown(index,false);
+        ledControl.setIntensity(index, 8);
+        ledControl.clearDisplay(index);
+    }
+
+    Wire.begin();
+    Wire.beginTransmission(MPU_addr);
+    Wire.write(0x6B);  // PWR_MGMT_1 register
+    Wire.write(0);     // set to zero (wakes up the MPU-6050)
+    Wire.endTransmission(true);
+
+    realTimeClock.begin();
+
+    // Toggle 
+    timer.every(1000, toggle_timer);
+    timer.every(600, toggle_timer_600);
+
+    Serial.begin(9600);
+    // DFPlayerMini initialize
+    mySoftwareSerial.begin(9600);
+    Serial.println();
+    Serial.println(F("DFRobot DFPlayer Mini Demo"));
+    Serial.println(F("Initializing DFPlayer ... (May take 3~5 seconds)"));
+    if (!myDFPlayer.begin(mySoftwareSerial))
+    {  //Use softwareSerial to communicate with mp3.
+        Serial.println(F("Unable to begin:"));
+        Serial.println(F("1.Please recheck the connection!"));
+        Serial.println(F("2.Please insert the SD card!"));
+    while(true);
+    }
+    Serial.println(F("DFPlayer Mini online."));
+    myDFPlayer.volume(20);  //Set volume value. From 0 to 30
+    clipcount = myDFPlayer.readFileCounts();
+    Serial.println(clipcount); //read all file counts in SD card
+    startupsequence(200);
 }
 
 void loop()
@@ -1655,7 +1844,10 @@ void loop()
     }
     
     if (action == displayIMUAttitude) {
-        actionReadIMU();  // V16N17 ReadIMU
+        actionReadIMU(Accel);  // V16N17 ReadIMU Accel
+    }
+    if (action == displayIMUGyro) {
+        actionReadIMU(Gyro);  // V16N18 ReadIMU Gyro
     }
     else if (action == displayRealTimeClock) {
         actionReadTime();   // V16N36 ReadTime
