@@ -1,5 +1,4 @@
 # opendskyrevised-2020-03-24
-Based on rondiamonds openDSKY (https://github.com/rondiamond/OpenDSKY)
 
 Open DSKY is a Kickstarter project from S&T Geotronics.
 It offers a 3D-printed replica of the Display & Keyboard (DSKY) used in the Apollo Command and Lunar Modules.
@@ -31,8 +30,10 @@ Note that the Audio only works if you connect D4 & D5 of the Arduino to the RX a
 
 - P69     - Play JFK
 
-This project is NOT affiliated with S&T Geotronics. It is offered as open-source under the MIT License.
+## Disclamer and Ackknowledgements
+Based on rondiamonds openDSKY (https://github.com/rondiamond/OpenDSKY)
 
+This project is NOT affiliated with S&T Geotronics. It is offered as open-source under the MIT License.
 For questions regarding the OpenDSKY project, hardware and its original software, please contact: https://www.stgeotronics.com
 
 ## IDE
