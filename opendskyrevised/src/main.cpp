@@ -234,6 +234,8 @@ bool blink = false;
 bool blinkverb = true;
 bool blinknoun = true;
 bool blinkprog = true;
+bool imutoggle = true;
+bool uplink_compact_toggle = true;
 unsigned long blink_previousMillis = 0; 
 const long blink_interval = 600;
 int clipnum = 1;
@@ -652,7 +654,6 @@ void processIdleMode()
         fresh = true;
         oldKey = keyValue;
     }
-
     if (fresh == true) {
         if (keyValue == keyVerb) {
             // verb
@@ -740,13 +741,9 @@ void processVerbInputMode()
         if ((keyValue == keyEnter) && (fresh == true)) {
             fresh = false;
             //das vorherige verb in verb_old speichern, mann weiss ja nie
-            Serial.println("Verbinput mode");
             verb_old2 = verb_old;
             verb_old = verb;
             verb = ((verbNew[0] * 10) + (verbNew[1]));
-            Serial.print("verb_old2 : "); Serial.println(verb_old2);
-            Serial.print("verb_old  : "); Serial.println(verb_old);
-            Serial.print("verb      : "); Serial.println(verb);
             if (verb != verb_old)
             {
                 // es wurde ein neues Verb eingegeben, daher muss noun auf 0 gesetzt werden
@@ -849,9 +846,7 @@ void processNounInputMode()
             error = 0;
             noun_error = false;
             setLamp(green, lampNoun);
-            ledControl.setRow(0,4,0);
-            ledControl.setRow(0,5,0);
-            turnOffLampNumber(lampOprErr);
+            setLamp(off,lampOprErr);
             fresh = false;
         } //resrt reeor
 
@@ -860,10 +855,6 @@ void processNounInputMode()
             noun_old2 = noun_old;
             noun_old = noun;
             noun = ((nounNew[0] * 10) + (nounNew[1]));
-            Serial.println("ProcNounInput");
-            Serial.print("noun_old2 : "); Serial.println(noun_old2);
-            Serial.print("noun_old  : "); Serial.println(noun_old);
-            Serial.print("noun      : "); Serial.println(noun);
             fresh = false;
             if ((noun != nounIMUAttitude)
                 && (noun != nounIMUgyro)
@@ -898,12 +889,12 @@ void processNounInputMode()
             fresh = false;
             if (noun == 0) {
                 //verb
-                printNoun(off, noun);
+                printNoun(noun);
                 //ledControl.setRow(0, 4, 0);
                 //ledControl.setRow(0, 5, 0);
             }
             else {
-                printNoun(green, noun);
+                printNoun(noun);
                 //setDigits(0, 4, nounOld[0]);
                 //setDigits(0, 5, nounOld[1]);
             }
@@ -934,12 +925,14 @@ void processNounInputMode()
 
 void executeNounInputMode()
 { // inputting the noun
+    //Serial.println("Begin exexuteNounInputMode");
     setLamp(yellow, lampNoun);
     toggleKeyReleaseLamp();
     if (error == 1) {
         flasher();
     }
     keyValue = readKeyboard();
+    //Serial.println("End exexuteNounInputMode");
     processNounInputMode();
 }
 
@@ -953,18 +946,11 @@ void processProgramInputMode()
     {
         fresh = true;
         oldKey = keyValue;
-        //Serial.print("neuer Prog Key wurde eingegeben: ");
-        //Serial.println(keyValue);
-        //Serial.print("prog   : "); Serial.println(currentProgram);
         if ((error == 1) && (keyValue == keyReset) && (fresh == true))
         {
             error = 0;
             turnOffLampNumber(lampOprErr);
             fresh = false;
-            //Serial.print("Error = 1, Keyreset wurde gedrückt, ");
-            //Serial.print("neuer Prog Key wurde eingegeben: ");
-            //Serial.println(keyValue);
-            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
         if ((keyValue == keyEnter) && (fresh == true)) 
         {
@@ -990,10 +976,6 @@ void processProgramInputMode()
                 error = 0;
                 newProg = true;
             }
-            //Serial.print("KeyEnter wurde gedrückt, ");
-            //Serial.print("neuer Prog Key wurde eingegeben: ");
-            //Serial.println(keyValue);
-            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
         if ((keyValue == keyRelease) && (fresh == true))
         {
@@ -1010,21 +992,13 @@ void processProgramInputMode()
                 setDigits(0, 2, progOld[0]);
                 setDigits(0, 3, progOld[1]);
             }
-            //Serial.print("KeyRelease wurde gedrückt");
-            //Serial.print("neuer Prog Key wurde eingegeben: ");
-            //Serial.println(keyValue);
-            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
         if ((keyValue <= keyNumber9) && (count < 2))
-        { // hier wird das neue Prog eingegeben
+        { // now the actual prog values are read, stored and printed
             progNew[count] = keyValue;
             setDigits(0, count+2, keyValue);
             count++;
             fresh = false;
-            //Serial.print("0-9 wurde gedrückt, ");
-            //Serial.print("neuer Prog Key wurde eingegeben: ");
-            //Serial.println(keyValue);
-            //Serial.print("prog   : "); Serial.println(currentProgram);
         }
     }
 }
@@ -1102,35 +1076,35 @@ void executeLampTestModeWithDuration(int durationInMilliseconds)
     setLamp(green, lampVerb);
     setLamp(green, lampNoun);
     setLamp(green, lampProg);
-    Serial.println("Lamptest V35");
+    /*Serial.println("Lamptest V35");
     Serial.print("verb_old2 : "); Serial.println(verb_old2);
     Serial.print("verb_old  : "); Serial.println(verb_old);
     Serial.print("verb      : "); Serial.println(verb);
     Serial.print("noun_old2 : "); Serial.println(noun_old2);
     Serial.print("noun_old  : "); Serial.println(noun_old);
-    Serial.print("noun      : "); Serial.println(noun);
+    Serial.print("noun      : "); Serial.println(noun); */
     // blank Verb readout if needed
     //verb = ((verbOld[0] * 10) + verbOld[1]);
     verb = verb_old;
-    Serial.println("Lamptest V35 verb = verb_old");
+    /*Serial.println("Lamptest V35 verb = verb_old");
     Serial.print("verb_old2 : "); Serial.println(verb_old2);
     Serial.print("verb_old  : "); Serial.println(verb_old);
     Serial.print("verb      : "); Serial.println(verb);
     Serial.print("noun_old2 : "); Serial.println(noun_old2);
     Serial.print("noun_old  : "); Serial.println(noun_old);
-    Serial.print("noun      : "); Serial.println(noun);
+    Serial.print("noun      : "); Serial.println(noun);*/
     printVerb(verb);
     
     // blank Prog readout if needed
     printProg(prog);
     noun = noun_old;
-    Serial.println("Lamptest V35 noun = noun_old");
+    /*Serial.println("Lamptest V35 noun = noun_old");
     Serial.print("verb_old2 : "); Serial.println(verb_old2);
     Serial.print("verb_old  : "); Serial.println(verb_old);
     Serial.print("verb      : "); Serial.println(verb);
     Serial.print("noun_old2 : "); Serial.println(noun_old2);
     Serial.print("noun_old  : "); Serial.println(noun_old);
-    Serial.print("noun      : "); Serial.println(noun);
+    Serial.print("noun      : "); Serial.println(noun); */
     printNoun(noun);
     keyValue = keyNone;
     mode = modeIdle;
@@ -1230,7 +1204,7 @@ void actionReadGPS()
     }
     else if (gpsfix == true)
     {
-        setLamp(white, lampPosition);
+        setLamp(off, lampPosition);
     }
     
     digitalWrite(7,HIGH);
@@ -1247,16 +1221,9 @@ void actionReadGPS()
          //setLamp(orange, lampPosition);
          setLamp(orange, lampVel);
          GPS_READ_STARTED = false;
-         //Serial.print("2 GPS_READ_STARTED ");Serial.println(GPS_READ_STARTED);  
       }
     }
     digitalWrite(7,LOW);
-    Serial.print("lat        ");Serial.println(gps.location.lat(), 6);
-    Serial.print("lon        ");Serial.println(gps.location.lng(), 6);
-    Serial.print("alt        ");Serial.println(gps.altitude.meters(), 6);
-    Serial.print("age        ");Serial.println(gps.altitude.age(), 6);
-    Serial.print("is updated ");Serial.println(gps.location.isUpdated(), 6);
-    Serial.print("is valid   ");Serial.println(gps.location.isValid(), 6);
     
     setLamp(off, lampAlt);
     setLamp(off, lampVel);
@@ -1273,7 +1240,6 @@ void actionReadGPS()
     valueForDisplay[register1Position] = gps.location.lat()*100;
     valueForDisplay[register2Position] = gps.location.lng()*100;
     valueForDisplay[register3Position] = gps.altitude.meters();
-    Serial.print("gpsfix ");Serial.println(gpsfix);  
     setDigits();
   }
   if (toggle == false)
@@ -1281,13 +1247,6 @@ void actionReadGPS()
      gpsread = true;
      GPS_READ_STARTED = true;
   }
-    
-
-//    valueForDisplay[register1Position] = latitude;
-//    valueForDisplay[register2Position] = longitude;
-//    valueForDisplay[register3Position] = altitude;
-//    digitalWrite(7, LOW);
-//    setDigits();
 }
 
 void actionSetTime()
@@ -1305,7 +1264,6 @@ void actionSetTime()
     }
 
     while (keyValue != keyEnter) {
-        Serial.println(keyValue);
         keyValue = readKeyboard();
         if (keyValue != oldKey) {
             oldKey = keyValue;
@@ -1464,12 +1422,6 @@ void actionSelectAudioclip()
             printVerb(verb, blink);
             printNoun(noun, blink);
         }
-        // set the LED with the ledState of the variable:
-        //Serial.print("verb      : "); Serial.println(verb);
-        //Serial.print("blink     : "); Serial.println(blink);
-        //Serial.print("toggle600 : "); Serial.println(toggle600);
-        //Serial.print("blinkverb : "); Serial.println(blinkverb);
-        //Serial.println(keyValue);
         keyValue = readKeyboard();
         if (keyValue != oldKey)
         {
@@ -1504,10 +1456,6 @@ void playTrack(uint8_t track)
    myDFPlayer.play(track);
    delay(200);
    int file = myDFPlayer.readCurrentFileNumber();
-
-   Serial.print("Track:");Serial.println(track);
-   Serial.print("File:");Serial.println(file);
-
    while (file != track) {
      myDFPlayer.play(track);
      delay(200);
@@ -1518,14 +1466,13 @@ void playTrack(uint8_t track)
 // V16 N98 play the selected Audio Clip
 void actionPlaySelectedAudioclip(int clipnum)
 {   // V16 N98 play the selected Audio Clip
-    // first print initial clipnum = 1
-    printVerb(verb, false);
+    printVerb(verb);
     printNoun(noun);
     playTrack(clipnum);
     action = none;
     verb = verbNone;
     noun = nounNone;
-    printVerb(verb, false);
+    printVerb(verb);
     printNoun(noun);
     setLamp(off, lampProg);
     ledControl.clearDisplay(1);
@@ -1536,20 +1483,26 @@ void actionPlaySelectedAudioclip(int clipnum)
 
 void flashUplinkAndComputerActivityRandomly()
 {
-    int randomNumber = random(10, 30);
-
-    if ((randomNumber == 15) || (randomNumber == 25)) {
-        illuminateWithRGBAndLampNumber(0, 150, 0, lampCompActy);
+    if ((toggle600 == true) && (uplink_compact_toggle == true))
+    {
+        uplink_compact_toggle = false;
+        int randomNumber = random(1, 50);
+        if ((randomNumber == 15) || (randomNumber == 25)) {
+            illuminateWithRGBAndLampNumber(0, 150, 0, lampCompActy);
+        }
+        else {
+            turnOffLampNumber(lampCompActy);
+        }
+        if ((randomNumber == 17) || (randomNumber == 25)) {
+            illuminateWithRGBAndLampNumber(90, 90, 90, lampUplinkActy);
+        }
+        else {
+            turnOffLampNumber(lampUplinkActy);
+        }
     }
-    else {
-        turnOffLampNumber(lampCompActy);
-    }
-
-    if ((randomNumber == 17) || (randomNumber == 25)) {
-        illuminateWithRGBAndLampNumber(90, 90, 90, lampUplinkActy);
-    }
-    else {
-        turnOffLampNumber(lampUplinkActy);
+    else if ((toggle600 == false) && (uplink_compact_toggle == false))
+    {
+        uplink_compact_toggle = true;
     }
 }
 
@@ -1562,123 +1515,102 @@ void flashUplinkAndComputerActivityRandomly()
 void readIMU(int imumode)
 {  // reads the IMU Values mode Gyro or Accel
     flashUplinkAndComputerActivityRandomly();
+    if ((toggle600 == true) && (imutoggle = true))
+    {   // only every 600ms an imuupdate to avoid flickering
+        imutoggle = false;
+        /* 
+        https://elektro.turanis.de/html/prj075/index.html
+        https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
+        const int ACCEL_OFFSET   = 200;
+        const int GYRO_OFFSET    = 151;  // 151
+        const int GYRO_SENSITITY = 131;  // 131 is sensivity of gyro from data sheet
+        const float GYRO_SCALE   = 2; //  0.02 by default - tweak as required
+        const float LOOP_TIME    = 0.15; // 0.1 = 100ms
+        */
+        Wire.beginTransmission(MPU_addr);
+        Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
+        Wire.endTransmission(false);
+        Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
 
-    /* 
-    https://elektro.turanis.de/html/prj075/index.html
-    https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
-    const int ACCEL_OFFSET   = 200;
-    const int GYRO_OFFSET    = 151;  // 151
-    const int GYRO_SENSITITY = 131;  // 131 is sensivity of gyro from data sheet
-    const float GYRO_SCALE   = 2; //  0.02 by default - tweak as required
-    const float LOOP_TIME    = 0.15; // 0.1 = 100ms
-    */
-    Wire.beginTransmission(MPU_addr);
-    Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
-    Wire.endTransmission(false);
-    Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
 
-
-    int accValueX = 0;
-    int accValueY = 0;
-    int accValueZ = 0;
-    int accCorrX = 0;
-    int accCorrY = 0;
-    int accCorrZ = 0;
-    float accAngleX = 0.0;
-    float accAngleY = 0.0;
-    float accAngleZ = 0.0;
-    int temp = 0;
-    int gyroValueX = 0;
-    int gyroValueY = 0;
-    int gyroValueZ = 0;
-    float gyroAngleX = 0.0;
-    float gyroAngleY = 0.0;
-    float gyroAngleZ = 0.0; 
-    float gyroCorrX = 0.0;
-    float gyroCorrY = 0.0;
-    float gyroCorrZ = 0.0;
-   
-    accValueX = (Wire.read() << 8) | Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-    accValueY = (Wire.read() << 8) | Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-    accValueZ = (Wire.read() << 8) | Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-    temp = (Wire.read() << 8) | Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-    gyroValueX = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-    gyroValueY = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-    gyroValueZ = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-    //valueForDisplay[register1Position] = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-    //valueForDisplay[register2Position] = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-    //valueForDisplay[register3Position] = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+        int accValueX = 0;
+        int accValueY = 0;
+        int accValueZ = 0;
+        int accCorrX = 0;
+        int accCorrY = 0;
+        int accCorrZ = 0;
+        float accAngleX = 0.0;
+        float accAngleY = 0.0;
+        float accAngleZ = 0.0;
+        int temp = 0;
+        int gyroValueX = 0;
+        int gyroValueY = 0;
+        int gyroValueZ = 0;
+        float gyroAngleX = 0.0;
+        float gyroAngleY = 0.0;
+        float gyroAngleZ = 0.0; 
+        float gyroCorrX = 0.0;
+        float gyroCorrY = 0.0;
+        float gyroCorrZ = 0.0;
     
-    temp = (temp / 340.00 + 36.53); //equation for temperature in degrees C from datasheet
-    
-    
-    accCorrX = accValueX - ACCEL_OFFSET;
-    //accCorrX = map(accCorrX, -16800, 16800, -90, 90); //ACCEL_SCALE
-    accCorrX = map(accCorrX, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
-    accAngleX = constrain(accCorrX, -90, 90);
-    // our IMU sits upside down in the DSKY, so we have to flip the angle
-    accAngleX = -accAngleX;
-    accAngleX = accAngleX + ACC_OFFSET_X;
+        accValueX = (Wire.read() << 8) | Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+        accValueY = (Wire.read() << 8) | Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+        accValueZ = (Wire.read() << 8) | Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+        temp = (Wire.read() << 8) | Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+        gyroValueX = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+        gyroValueY = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+        gyroValueZ = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+        
+        temp = (temp / 340.00 + 36.53); //equation for temperature in degrees C from datasheet
+        
+        
+        accCorrX = accValueX - ACCEL_OFFSET;
+        accCorrX = map(accCorrX, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+        accAngleX = constrain(accCorrX, -90, 90);
+        // our IMU sits upside down in the DSKY, so we have to flip the angle
+        accAngleX = -accAngleX;
+        accAngleX = accAngleX + ACC_OFFSET_X;
 
-    accCorrY = accValueY - ACCEL_OFFSET;
-    accCorrY = map(accCorrY, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
-    accAngleY = constrain(accCorrY, -90, 90);
-    accAngleY = accAngleY + ACC_OFFSET_Y;
+        accCorrY = accValueY - ACCEL_OFFSET;
+        accCorrY = map(accCorrY, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+        accAngleY = constrain(accCorrY, -90, 90);
+        accAngleY = accAngleY + ACC_OFFSET_Y;
 
-    accCorrZ = accValueZ - ACCEL_OFFSET;
-    accCorrZ = map(accCorrZ, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
-    accAngleZ = constrain(accCorrZ, -90, 90);
-    // our IMU sits upside down in the DSKY, so we have to flip the angle
-    accAngleZ = -accAngleZ;
-    accAngleZ = accAngleZ + ACC_OFFSET_Z;
+        accCorrZ = accValueZ - ACCEL_OFFSET;
+        accCorrZ = map(accCorrZ, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+        accAngleZ = constrain(accCorrZ, -90, 90);
+        // our IMU sits upside down in the DSKY, so we have to flip the angle
+        accAngleZ = -accAngleZ;
+        accAngleZ = accAngleZ + ACC_OFFSET_Z;
 
-    gyroCorrX = (float)((gyroValueX/GYRO_SENSITITY)+GYRO_OFFSET_X);
-    gyroAngleX = (gyroCorrX * GYRO_GRANGE) * -LOOP_TIME;
+        gyroCorrX = (float)((gyroValueX/GYRO_SENSITITY)+GYRO_OFFSET_X);
+        gyroAngleX = (gyroCorrX * GYRO_GRANGE) * -LOOP_TIME;
 
-    gyroCorrY = (float)((gyroValueY/GYRO_SENSITITY)+GYRO_OFFSET_Y);
-    gyroAngleY = (gyroCorrY * GYRO_GRANGE) * -LOOP_TIME;
+        gyroCorrY = (float)((gyroValueY/GYRO_SENSITITY)+GYRO_OFFSET_Y);
+        gyroAngleY = (gyroCorrY * GYRO_GRANGE) * -LOOP_TIME;
 
-    gyroCorrZ = (float)((gyroValueZ/GYRO_SENSITITY)+GYRO_OFFSET_Z);
-    gyroAngleZ = (gyroCorrZ * GYRO_GRANGE) * -LOOP_TIME;
+        gyroCorrZ = (float)((gyroValueZ/GYRO_SENSITITY)+GYRO_OFFSET_Z);
+        gyroAngleZ = (gyroCorrZ * GYRO_GRANGE) * -LOOP_TIME;
 
-    if (imumode == Gyro)
-    {
-        valueForDisplay[register1Position] = int(gyroAngleX*100);
-        valueForDisplay[register2Position] = int(gyroAngleY*100);
-        valueForDisplay[register3Position] = int(gyroAngleZ*100);
+        if (imumode == Gyro)
+        {
+            valueForDisplay[register1Position] = int(gyroAngleX*100);
+            valueForDisplay[register2Position] = int(gyroAngleY*100);
+            valueForDisplay[register3Position] = int(gyroAngleZ*100);
+        }
+        else if (imumode == Accel)
+        {
+            valueForDisplay[register1Position] = int(accAngleX*100);
+            valueForDisplay[register2Position] = int(accAngleY*100);
+            valueForDisplay[register3Position] = int(accAngleZ*100);
+        }
+        setDigits();
+        setLamp(off, lampNoAtt);
     }
-    else if (imumode == Accel)
+    else if ((toggle600 == false) && (imutoggle = false))
     {
-        valueForDisplay[register1Position] = int(accAngleX*100);
-        valueForDisplay[register2Position] = int(accAngleY*100);
-        valueForDisplay[register3Position] = int(accAngleZ*100);
+        imutoggle = true;
     }
-    
-    
-    //Serial.println("Gyrowerte:");
-    /*Serial.print("gyroValueX = ");    Serial.print(gyroValueX);
-    Serial.print(" gyroValueY = ");   Serial.print(gyroValueY);
-    Serial.print(" gyroValueZ = ");   Serial.print(gyroValueZ);
-    Serial.print(" gyroCorrX = ");     Serial.print(gyroCorrX);
-    Serial.print(" gyroCorrY = ");    Serial.print(gyroCorrY);
-    Serial.print(" gyroCorrZ = ");    Serial.print(gyroCorrZ);
-    Serial.print(" gyroAngleX = ");   Serial.print(gyroAngleX);
-    Serial.print(" gyroAngleY = ");   Serial.print(gyroAngleY);
-    Serial.print(" gyroAngleZ = "); Serial.println(gyroAngleZ);
-    Serial.println("");
-    Serial.print("accValueX = ");    Serial.print(accValueX);
-    Serial.print(" accValueY = ");   Serial.print(accValueY);
-    Serial.print(" accValueZ = ");   Serial.print(accValueZ);
-    Serial.print(" accCorrX = ");     Serial.print(accCorrX);
-    Serial.print(" accCorrY = ");     Serial.print(accCorrY);
-    Serial.print(" accelCorrZ = ");   Serial.print(accCorrZ);
-    Serial.print(" accAngleX = ");   Serial.print(accAngleX);
-    Serial.print(" accAngleY = ");   Serial.print(accAngleY);
-    Serial.print(" accAngleZ = "); Serial.print(accAngleZ);
-    Serial.print(" Temp = "); Serial.println(temp*100);
-    */
-    setDigits();
-    //delay(1000);
 }
 
 void actionReadIMU(int imumode) {
@@ -1761,7 +1693,9 @@ void setup()
     myDFPlayer.volume(20);  //Set volume value. From 0 to 30
     clipcount = myDFPlayer.readFileCounts();
     Serial.println(clipcount); //read all file counts in SD card
-    startupsequence(200);
+    startupsequence(100);
+    setLamp(white, lampNoAtt);
+    setLamp(white, lampPosition);
 }
 
 void loop()
@@ -1811,32 +1745,24 @@ void loop()
         if (action == none)
         {
             setLamp(white, lampSTBY);
-            //setLamp(off, lampProgCond);
         }
         else if (action != none)
         {
             setLamp(off, lampSTBY);
-            //setLamp(yellow, lampProgCond);
         }
-        //setLamp(green, lampVerb);
-        //setLamp(green, lampNoun);
-        //setLamp(green, lampProg);
     }
     else if (mode == modeInputVerb) {
         executeVerbInputMode();
         setLamp(off, lampSTBY);
-        //setLamp(orange, lampVerb);
 
     }
     else if (mode == modeInputNoun) {
         executeNounInputMode();
         setLamp(off, lampSTBY);
-        //setLamp(orange, lampNoun);
     }
     else if (mode == modeInputProgram) {
         executeProgramInputMode();
         setLamp(off, lampSTBY);
-        //setLamp(orange, lampProg);
     }
     else if (mode == modeLampTest) {
         setLamp(off, lampSTBY);
