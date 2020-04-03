@@ -188,7 +188,12 @@ enum registerDisplayPositions: int
     register2Position       = 5,
     register3Position       = 6
 };
-
+enum dregister: int
+{
+     register1              = 1,
+     register2              = 2,
+     register3              = 3
+};
 
 enum imumode: int
 { // imumode Gyro or Accelration
@@ -235,6 +240,7 @@ bool blinkverb = true;
 bool blinknoun = true;
 bool blinkprog = true;
 bool imutoggle = true;
+bool printregtoggle = true;
 bool uplink_compact_toggle = true;
 unsigned long blink_previousMillis = 0; 
 const long blink_interval = 600;
@@ -475,6 +481,131 @@ void setDigits()
         }
     }
 }
+void clearRegister(int dregister)
+{
+    ledControl.clearDisplay(dregister);
+    //ledControl.setRow(dregister,0,B00000000);
+    //ledControl.setRow(dregister,1,B00000000);
+    //ledControl.setRow(dregister,2,B00000000);
+    //ledControl.setRow(dregister,3,B00000000);
+    //ledControl.setRow(dregister,4,B00000000);
+    //ledControl.setRow(dregister,5,B00000000);
+}
+
+void printRegister(int dregister, long number = 0, bool leadzero = true, bool blink = false, bool alarm = false)
+{   // Print the Register 1, 2, or 3, the number, if you want leading zeros if you want to blink it, check if it is an alarm
+    // Setdigit: Register 0 - 3, plus sign 0, 1-5 numbers
+    //num4 = (fm_station / 10) % 10;
+    //num3 = (fm_station / 100) % 10;
+    //num2 = (fm_station / 1000) % 10;
+    //num1 = (fm_station / 10000) % 10;
+    int one = 0;
+    int ten = 0;
+    int hundred = 0;
+    long thousand = 0;
+    long tenthousand = 0;
+    long rest = 0;
+    bool is_positive = true;
+    // first, check if the number is positive or negative and set the plus or minus sign
+    if (number < 0)
+    {
+        is_positive = false;
+        number = -number;
+        // Set the minus sign 
+        ledControl.setRow(dregister, 0, B00100100);
+    }
+    else 
+    {
+        // Set the plus sign
+        ledControl.setRow(dregister, 0, B01110100);
+    }
+    // now seperate the number
+    if (number == 0)
+    {
+        one = int(number);
+    }
+    else if ((number > 0) && (number < 10))
+    {
+        one = int(number);
+    }
+    else if ((number >= 10) && (number < 100))
+    {   
+        one = number % 10;
+        ten = (number - one) / 10;
+    }
+    else if ((number >= 100) && (number < 1000))
+    {
+        one = number % 10;
+        ten = (number / 10) % 10;
+        hundred = (number / 100) % 10;
+
+    }
+    else if ((number >= 1000) && (number < 10000))
+    {
+        one = number % 10;
+        ten = (number / 10) % 10;
+        hundred = (number / 100) % 10;
+        thousand = (number / 1000) % 10;
+    }
+    else if ((number >= 10000) && (number < 100000))
+    {
+        one = number % 10;
+        ten = (number / 10) % 10;
+        hundred = (number / 100) % 10;
+        thousand = (number / 1000) % 10;
+        tenthousand = (number / 10000) % 10;
+    }
+    // show the number
+    if (blink == false)
+    {
+        if (number >= 100000)
+        {
+            //ledControl.setRow(dregister,0,B00000000);
+            //ledControl.setRow(dregister,1,B01001111);
+            //ledControl.setRow(dregister,2,B00000000);
+            //ledControl.setRow(dregister,3,B00000000);
+            //ledControl.setRow(dregister,4,B00000000);
+            //ledControl.setRow(dregister,5,B00000000);
+            ledControl.setRow(dregister,0,B00000000);
+            ledControl.setChar(dregister,1,' ',false);
+            ledControl.setChar(dregister,2,'1', false);
+            ledControl.setChar(dregister,3,'3', false);
+            ledControl.setChar(dregister,4,'0', false);
+            ledControl.setChar(dregister,5,'5', false);
+        }
+        else 
+        {
+            ledControl.setDigit(dregister, 5, one, false);
+            ledControl.setDigit(dregister, 4, ten, false);
+            ledControl.setDigit(dregister, 3, hundred, false);
+            ledControl.setDigit(dregister, 2, thousand, false);
+            ledControl.setDigit(dregister, 1, tenthousand, false);
+        }
+    }
+    if (blink == true)
+    {
+        if ((toggle600 == true) && (printregtoggle == true))
+        {   
+            printregtoggle = false;
+            ledControl.setDigit(dregister, 5, one, false);
+            ledControl.setDigit(dregister, 4, ten, false);
+            ledControl.setDigit(dregister, 3, hundred, false);
+            ledControl.setDigit(dregister, 2, thousand, false);
+            ledControl.setDigit(dregister, 1, tenthousand, false);
+        }
+        else if ((toggle600 == false) && (printregtoggle == false))
+        {
+            printregtoggle = true;
+            ledControl.clearDisplay(dregister);
+            //ledControl.setRow(dregister,0,B00000000);
+            //ledControl.setRow(dregister,1,B00000000);
+            //ledControl.setRow(dregister,2,B00000000);
+            //ledControl.setRow(dregister,3,B00000000);
+            //ledControl.setRow(dregister,4,B00000000);
+            //ledControl.setRow(dregister,5,B00000000);
+        }
+    }
+}
 
 void printProg(int prog, bool blink = false)
 {  // Print the Progam PROG
@@ -586,9 +717,9 @@ void flasher()
         setLamp(orange, lampNoun);
     }
     if (toggle == false) {
-        illuminateWithRGBAndLampNumber(100, 100, 100, lampOprErr);
+        setLamp(white,  lampOprErr);
     } else {
-        turnOffLampNumber(lampOprErr);
+        setLamp(off, lampOprErr);
     }
 }
 
@@ -712,10 +843,10 @@ void executeIdleMode()
 void toggleKeyReleaseLamp()
 {
     if (toggle == false) {
-        illuminateWithRGBAndLampNumber(100, 100, 100, lampKeyRelease);
+        setLamp(white, lampKeyRelease);
     }
     else {
-        turnOffLampNumber(lampKeyRelease);
+        setLamp(off, lampKeyRelease);
     }
 }
 
@@ -824,7 +955,6 @@ void processVerbInputMode()
 void executeVerbInputMode()
 {
     // inputting the verb
-    //illuminateWithRGBAndLampNumber(0, 150, 0, lampVerb);
     setLamp(yellow, lampVerb);
     toggleKeyReleaseLamp();
     if (error == 1) {
@@ -1005,7 +1135,7 @@ void processProgramInputMode()
 
 void executeProgramInputMode()
 { // inputting the program
-    illuminateWithRGBAndLampNumber(0, 150, 0, lampProg);
+    setLamp(green, lampProg);
     toggleKeyReleaseLamp();
     if (error == 1) {
         flasher();
@@ -1187,11 +1317,15 @@ void actionReadTime()
     }
     int hundreds = ( ( millis()-previousMillis )/10 )%100;
     int tenth = hundreds - (hundreds % 10);
-    valueForDisplay[register1Position] = (now.hour());
-    valueForDisplay[register2Position] = (now.minute());
-    valueForDisplay[register3Position] = ((now.second() * 100) + tenth);
-    setDigits();
+    //valueForDisplay[register1Position] = (now.hour());
+    //valueForDisplay[register2Position] = (now.minute());
+    //valueForDisplay[register3Position] = ((now.second() * 100) + tenth);
+    //setDigits();
+    printRegister(1,(now.hour()));
+    printRegister(2,(now.minute()));
+    printRegister(3,((now.second() * 100) + tenth));
 }
+
 
 void actionReadGPS()
 { // Read GPS
@@ -1212,7 +1346,7 @@ void actionReadGPS()
     gpsread = false;
     // int index = 0;
     Serial.begin(9600);
-    delay(200);
+    //delay(200);
     while((Serial.available()) && (GPS_READ_STARTED == true))
     {
       setLamp(white, lampAlt);
@@ -1237,10 +1371,9 @@ void actionReadGPS()
     {
         gpsfix = false;
     }
-    valueForDisplay[register1Position] = gps.location.lat()*100;
-    valueForDisplay[register2Position] = gps.location.lng()*100;
-    valueForDisplay[register3Position] = gps.altitude.meters();
-    setDigits();
+    printRegister(1,gps.location.lat()*100);
+    printRegister(2,gps.location.lng()*100);
+    printRegister(3,gps.altitude.meters());
   }
   if (toggle == false)
   {
@@ -1280,13 +1413,9 @@ void actionSetTime()
                 nowHour = 23;
             }
         }
-        valueForDisplay[register1Position] = nowHour;
-        valueForDisplay[register2Position] = nowMinute;
-        valueForDisplay[register3Position] = (nowSecond * 100); // emulate milliseconds
-        setDigits();
-        delay(200);
-        ledControl.clearDisplay(1);
-        delay(50);
+        printRegister(1,nowHour);
+        printRegister(2,nowMinute);
+        printRegister(3,(nowSecond * 100)); // emulate milliseconds
     }
 
     while (keyValue == keyEnter) {
@@ -1310,13 +1439,9 @@ void actionSetTime()
                 nowMinute = 59;
             }
         }
-        valueForDisplay[register1Position] = nowHour;
-        valueForDisplay[register2Position] = nowMinute;
-        valueForDisplay[register3Position] = (nowSecond * 100);
-        setDigits();
-        delay(200);
-        ledControl.clearDisplay(2);
-        delay(50);
+        printRegister(1,nowHour);
+        printRegister(2,nowMinute);
+        printRegister(3,(nowSecond * 100));
     }
 
     while (keyValue == keyEnter) {
@@ -1340,14 +1465,9 @@ void actionSetTime()
                 nowSecond = 59;
             }
         }
-
-        valueForDisplay[register1Position] = nowHour;
-        valueForDisplay[register2Position] = nowMinute;
-        valueForDisplay[register3Position] = (nowSecond *100);
-        setDigits();
-        delay(200);
-        ledControl.clearDisplay(3);
-        delay(50);
+        printRegister(1,nowHour);
+        printRegister(2,nowMinute);
+        printRegister(3,(nowSecond *100));
     }
     realTimeClock.adjust(DateTime(nowYear, nowMonth, nowDay, nowHour, nowMinute, nowSecond));
     action = displayRealTimeClock;
@@ -1395,10 +1515,8 @@ void mode11() {
 void actionSelectAudioclip()
 {   // V21 N98 read & enter & play the selected Audio Clip
     // first print initial clipnum = 1
-    valueForDisplay[register1Position] = clipnum;
-    setDigits();
-    ledControl.clearDisplay(2);
-    ledControl.clearDisplay(3);
+    printRegister(1,clipnum);
+    setLamp(off,lampProg);
     // enter can be pressed several times?
     while (keyValue == keyEnter) {
         keyValue = readKeyboard();
@@ -1439,8 +1557,7 @@ void actionSelectAudioclip()
                 clipnum = clipcount;
             }
         }
-        valueForDisplay[register1Position] = clipnum;
-        setDigits();
+        printRegister(1,clipnum);
     }
     action = PlaySelectedAudioclip;
     verb = verbDisplayDecimal;
@@ -1474,11 +1591,11 @@ void actionPlaySelectedAudioclip(int clipnum)
     noun = nounNone;
     printVerb(verb);
     printNoun(noun);
-    setLamp(off, lampProg);
-    ledControl.clearDisplay(1);
-    ledControl.clearDisplay(2);
-    ledControl.clearDisplay(3);
-    setDigits();
+    printProg(prog);
+    setLamp(green, lampProg);
+    clearRegister(1);
+    clearRegister(2);
+    clearRegister(3);
 }
 
 void flashUplinkAndComputerActivityRandomly()
@@ -1488,16 +1605,16 @@ void flashUplinkAndComputerActivityRandomly()
         uplink_compact_toggle = false;
         int randomNumber = random(1, 50);
         if ((randomNumber == 15) || (randomNumber == 25)) {
-            illuminateWithRGBAndLampNumber(0, 150, 0, lampCompActy);
+            setLamp(green,lampCompActy);
         }
         else {
-            turnOffLampNumber(lampCompActy);
+            setLamp(off,lampCompActy);
         }
         if ((randomNumber == 17) || (randomNumber == 25)) {
-            illuminateWithRGBAndLampNumber(90, 90, 90, lampUplinkActy);
+            setLamp(white,lampUplinkActy);
         }
         else {
-            turnOffLampNumber(lampUplinkActy);
+            setLamp(off,lampUplinkActy);
         }
     }
     else if ((toggle600 == false) && (uplink_compact_toggle == false))
@@ -1514,107 +1631,108 @@ void flashUplinkAndComputerActivityRandomly()
 
 void readIMU(int imumode)
 {  // reads the IMU Values mode Gyro or Accel
-    flashUplinkAndComputerActivityRandomly();
-    if ((toggle600 == true) && (imutoggle = true))
-    {   // only every 600ms an imuupdate to avoid flickering
-        imutoggle = false;
-        /* 
-        https://elektro.turanis.de/html/prj075/index.html
-        https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
-        const int ACCEL_OFFSET   = 200;
-        const int GYRO_OFFSET    = 151;  // 151
-        const int GYRO_SENSITITY = 131;  // 131 is sensivity of gyro from data sheet
-        const float GYRO_SCALE   = 2; //  0.02 by default - tweak as required
-        const float LOOP_TIME    = 0.15; // 0.1 = 100ms
-        */
-        Wire.beginTransmission(MPU_addr);
-        Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
-        Wire.endTransmission(false);
-        Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
+    /* 
+    https://elektro.turanis.de/html/prj075/index.html
+    https://github.com/griegerc/arduino-gy521/blob/master/gy521-read-angle/gy521-read-angle.ino
+    const int ACCEL_OFFSET   = 200;
+    const int GYRO_OFFSET    = 151;  // 151
+    const int GYRO_SENSITITY = 131;  // 131 is sensivity of gyro from data sheet
+    const float GYRO_SCALE   = 2; //  0.02 by default - tweak as required
+    const float LOOP_TIME    = 0.15; // 0.1 = 100ms
+    */
+    Wire.beginTransmission(MPU_addr);
+    Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
+    Wire.endTransmission(false);
+    Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
+    int accValueX = 0;
+    int accValueY = 0;
+    int accValueZ = 0;
+    int accCorrX = 0;
+    int accCorrY = 0;
+    int accCorrZ = 0;
+    float accAngleX = 0.0;
+    float accAngleY = 0.0;
+    float accAngleZ = 0.0;
+    int temp = 0;
+    int gyroValueX = 0;
+    int gyroValueY = 0;
+    int gyroValueZ = 0;
+    float gyroAngleX = 0.0;
+    float gyroAngleY = 0.0;
+    float gyroAngleZ = 0.0; 
+    float gyroCorrX = 0.0;
+    float gyroCorrY = 0.0;
+    float gyroCorrZ = 0.0;
+  
+    accValueX = (Wire.read() << 8) | Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+    accValueY = (Wire.read() << 8) | Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+    accValueZ = (Wire.read() << 8) | Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+    temp = (Wire.read() << 8) | Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+    gyroValueX = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+    gyroValueY = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+    gyroValueZ = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+        
+    temp = (temp / 340.00 + 36.53); //equation for temperature in degrees C from datasheet
+        
+        
+    accCorrX = accValueX - ACCEL_OFFSET;
+    accCorrX = map(accCorrX, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+    accAngleX = constrain(accCorrX, -90, 90);
+    // our IMU sits upside down in the DSKY, so we have to flip the angle
+    accAngleX = -accAngleX;
+    accAngleX = accAngleX + ACC_OFFSET_X;
 
+    accCorrY = accValueY - ACCEL_OFFSET;
+    accCorrY = map(accCorrY, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
 
-        int accValueX = 0;
-        int accValueY = 0;
-        int accValueZ = 0;
-        int accCorrX = 0;
-        int accCorrY = 0;
-        int accCorrZ = 0;
-        float accAngleX = 0.0;
-        float accAngleY = 0.0;
-        float accAngleZ = 0.0;
-        int temp = 0;
-        int gyroValueX = 0;
-        int gyroValueY = 0;
-        int gyroValueZ = 0;
-        float gyroAngleX = 0.0;
-        float gyroAngleY = 0.0;
-        float gyroAngleZ = 0.0; 
-        float gyroCorrX = 0.0;
-        float gyroCorrY = 0.0;
-        float gyroCorrZ = 0.0;
+    accAngleY = constrain(accCorrY, -90, 90);
+    accAngleY = accAngleY + ACC_OFFSET_Y;
+
+    accCorrZ = accValueZ - ACCEL_OFFSET;
+    accCorrZ = map(accCorrZ, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
+    accAngleZ = constrain(accCorrZ, -90, 90);
+        // our IMU sits upside down in the DSKY, so we have to flip the angle
+    accAngleZ = -accAngleZ;
+    accAngleZ = accAngleZ + ACC_OFFSET_Z;
+
+    gyroCorrX = (float)((gyroValueX/GYRO_SENSITITY)+GYRO_OFFSET_X);
+    gyroAngleX = (gyroCorrX * GYRO_GRANGE) * -LOOP_TIME;
+    gyroCorrY = (float)((gyroValueY/GYRO_SENSITITY)+GYRO_OFFSET_Y);
+    gyroAngleY = (gyroCorrY * GYRO_GRANGE) * -LOOP_TIME;
+    gyroCorrZ = (float)((gyroValueZ/GYRO_SENSITITY)+GYRO_OFFSET_Z);
+    gyroAngleZ = (gyroCorrZ * GYRO_GRANGE) * -LOOP_TIME;
+    setLamp(off, lampNoAtt);
+    if (imumode == Gyro)
+        {
+            printRegister(1,int(gyroAngleX*100));
+            printRegister(2,int(gyroAngleY*100));
+            printRegister(3,int(gyroAngleZ*100));
+        }
+    else if (imumode == Accel)
+        {
+            printRegister(1,int(accAngleX*100));
+            printRegister(2,int(accAngleY*100));
+            printRegister(3,int(accAngleZ*100));
+    }
     
-        accValueX = (Wire.read() << 8) | Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-        accValueY = (Wire.read() << 8) | Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-        accValueZ = (Wire.read() << 8) | Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-        temp = (Wire.read() << 8) | Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
-        gyroValueX = (Wire.read() << 8) | Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-        gyroValueY = (Wire.read() << 8) | Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-        gyroValueZ = (Wire.read() << 8) | Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-        
-        temp = (temp / 340.00 + 36.53); //equation for temperature in degrees C from datasheet
-        
-        
-        accCorrX = accValueX - ACCEL_OFFSET;
-        accCorrX = map(accCorrX, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
-        accAngleX = constrain(accCorrX, -90, 90);
-        // our IMU sits upside down in the DSKY, so we have to flip the angle
-        accAngleX = -accAngleX;
-        accAngleX = accAngleX + ACC_OFFSET_X;
-
-        accCorrY = accValueY - ACCEL_OFFSET;
-        accCorrY = map(accCorrY, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
-        accAngleY = constrain(accCorrY, -90, 90);
-        accAngleY = accAngleY + ACC_OFFSET_Y;
-
-        accCorrZ = accValueZ - ACCEL_OFFSET;
-        accCorrZ = map(accCorrZ, -ACCEL_SCALE, ACCEL_SCALE, -90, 90);
-        accAngleZ = constrain(accCorrZ, -90, 90);
-        // our IMU sits upside down in the DSKY, so we have to flip the angle
-        accAngleZ = -accAngleZ;
-        accAngleZ = accAngleZ + ACC_OFFSET_Z;
-
-        gyroCorrX = (float)((gyroValueX/GYRO_SENSITITY)+GYRO_OFFSET_X);
-        gyroAngleX = (gyroCorrX * GYRO_GRANGE) * -LOOP_TIME;
-
-        gyroCorrY = (float)((gyroValueY/GYRO_SENSITITY)+GYRO_OFFSET_Y);
-        gyroAngleY = (gyroCorrY * GYRO_GRANGE) * -LOOP_TIME;
-
-        gyroCorrZ = (float)((gyroValueZ/GYRO_SENSITITY)+GYRO_OFFSET_Z);
-        gyroAngleZ = (gyroCorrZ * GYRO_GRANGE) * -LOOP_TIME;
-
-        if (imumode == Gyro)
-        {
-            valueForDisplay[register1Position] = int(gyroAngleX*100);
-            valueForDisplay[register2Position] = int(gyroAngleY*100);
-            valueForDisplay[register3Position] = int(gyroAngleZ*100);
-        }
-        else if (imumode == Accel)
-        {
-            valueForDisplay[register1Position] = int(accAngleX*100);
-            valueForDisplay[register2Position] = int(accAngleY*100);
-            valueForDisplay[register3Position] = int(accAngleZ*100);
-        }
-        setDigits();
-        setLamp(off, lampNoAtt);
-    }
-    else if ((toggle600 == false) && (imutoggle = false))
-    {
-        imutoggle = true;
-    }
 }
 
-void actionReadIMU(int imumode) {
-    readIMU(imumode);
+void actionReadIMU(int imumode)
+{
+    if ((toggle600 == true) && (imutoggle == true))
+    {   // only every 600ms an imuupdate to avoid flickering
+        imutoggle = false;
+        flashUplinkAndComputerActivityRandomly();
+        readIMU(imumode);
+        
+        
+    }
+    else if ((toggle600 == false) && (imutoggle == false))
+    {
+        flashUplinkAndComputerActivityRandomly();
+        imutoggle = true;
+        readIMU(imumode);
+    }
 }
 
 
@@ -1693,9 +1811,25 @@ void setup()
     myDFPlayer.volume(20);  //Set volume value. From 0 to 30
     clipcount = myDFPlayer.readFileCounts();
     Serial.println(clipcount); //read all file counts in SD card
-    startupsequence(100);
+    //startupsequence(100);
+    delay(100);
+    clearRegister(1);
+    delay(100);
+    clearRegister(2);
+    delay(100);
+    clearRegister(3);
+    delay(100);
+
     setLamp(white, lampNoAtt);
+    delay(100);
     setLamp(white, lampPosition);
+    delay(100);
+    setLamp(green, lampNoun);
+    delay(100);
+    setLamp(green, lampVerb);
+    delay(100);
+    setLamp(green, lampProg);
+    delay(100);
 }
 
 void loop()
@@ -1715,8 +1849,7 @@ void loop()
         currentProgram = programNone;
         if (currentProgram == 0)
         {
-            ledControl.setRow(0, 2, 0);
-            ledControl.setRow(0, 3, 0);
+            setLamp(off,lampProg);
         }
     }
     else if (currentProgram == programApollo11Audio) {
@@ -1725,8 +1858,7 @@ void loop()
         currentProgram = programNone;
         if (currentProgram == 0)
         {
-            ledControl.setRow(0, 2, 0);
-            ledControl.setRow(0, 3, 0);
+            setLamp(off,lampProg);
         }
     }
     else if (currentProgram == programApollo13Audio) {
@@ -1735,8 +1867,7 @@ void loop()
         currentProgram = programNone;
         if (currentProgram == 0)
         {
-            ledControl.setRow(0, 2, 0);
-            ledControl.setRow(0, 3, 0);
+            setLamp(off,lampProg);
         }
     }
 
