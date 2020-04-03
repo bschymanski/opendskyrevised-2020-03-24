@@ -504,12 +504,9 @@ void printRegister(int dregister, long number = 0, bool leadzero = true, bool bl
     int hundred = 0;
     long thousand = 0;
     long tenthousand = 0;
-    long rest = 0;
-    bool is_positive = true;
     // first, check if the number is positive or negative and set the plus or minus sign
     if (number < 0)
     {
-        is_positive = false;
         number = -number;
         // Set the minus sign 
         ledControl.setRow(dregister, 0, B00100100);
@@ -1483,9 +1480,7 @@ void actionSetDate()
     byte yearToSet[4];
     byte monthToSet[2];
     byte dayToSet[2];
-    byte hourToSet[2];
-    byte minuteToSet[2];
-    byte secondToSet[2];
+
 
     DateTime now = realTimeClock.now();
     int nowYear = now.year();
