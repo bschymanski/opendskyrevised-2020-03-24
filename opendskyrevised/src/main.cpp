@@ -201,8 +201,17 @@ enum imumode: int
     Accel                   = 0
 };
 
+enum inputnumsign: int
+{ // imumode Gyro or Accelration
+    plus                    = 1,
+    minus                   = 0
+};
+
+
 long valueForDisplay[7];
 byte digitValue[7][7];
+byte inputnum[5];
+int inputnumsign = plus;
 byte keyValue = keyNone;
 byte oldKey = none;
 bool fresh = true;
@@ -222,6 +231,8 @@ byte nounNew[2];
 byte nounOld[2];
 byte currentProgram = programNone;
 byte prog = 0;
+byte prog_old = 0;
+byte prog_old2 = 0;
 byte progNew[2];
 byte progOld[2];
 bool newProg = false;
@@ -230,6 +241,8 @@ byte mode = modeIdle;
 byte oldMode = modeIdle;
 bool toggle = false;
 bool toggle600 = false;
+bool toggle250 = false;
+bool toggled250 = false;
 byte toggle600count = 0;
 byte toggleCount = 0;
 bool error = 0;
@@ -310,6 +323,10 @@ bool toggle_timer_600(void *)
   return true; // repeat? true
 }
 
+bool toggle_timer_250(void *) {
+  toggle250 = !toggle250;
+  return true; // repeat? true
+}
 
 void validateAction()
 {
@@ -1073,30 +1090,36 @@ void processProgramInputMode()
     {
         fresh = true;
         oldKey = keyValue;
-        if ((error == 1) && (keyValue == keyReset) && (fresh == true))
+        if ((error == 1) && (keyValue == keyClear) && (fresh == true))
         {
             error = 0;
-            turnOffLampNumber(lampOprErr);
+            prog = 0;
+            newProg = false;
+            mode = modeInputProgram;
+            count = 0;
             fresh = false;
+            turnOffLampNumber(lampOprErr);
+            printProg(prog);
         }
         if ((keyValue == keyEnter) && (fresh == true)) 
         {
             fresh = false;
+            prog_old2 = prog_old;
+            prog_old = currentProgram;
             currentProgram = ((progNew[0] * 10) + (progNew[1]));
+            prog = currentProgram;
             fresh = false;
-            if ((currentProgram != programNone)
-                && (currentProgram != programJFKAudio)
-                && (currentProgram != programApollo11Audio)
-                && (currentProgram != programApollo13Audio))
+            if ((currentProgram != programNone) && (currentProgram != programJFKAudio) && (currentProgram != programApollo11Audio) && (currentProgram != programApollo13Audio))
             {
                 currentProgram = ((progOld[0] * 10) + progOld[1]);    // restore prior noun
+                prog = prog_old;
                 error = 1;
             }
             else
             {
                 turnOffLampNumber(lampOprErr);
                 turnOffLampNumber(lampKeyRelease);
-                turnOffLampNumber(lampProg);
+                setLamp(green, lampProg);
                 mode = modeIdle;
                 count = 0;
                 fresh = false;
@@ -1107,18 +1130,12 @@ void processProgramInputMode()
         if ((keyValue == keyRelease) && (fresh == true))
         {
             mode = oldMode;
+            prog = prog_old;
             turnOffLampNumber(lampKeyRelease);
-            turnOffLampNumber(lampProg);
+            setLamp(green, lampProg);
             count = 0;
             fresh = false;
-            if (currentProgram == 0) {
-                ledControl.setRow(0, 2, 0);
-                ledControl.setRow(0, 3, 0);
-            }
-            else {
-                setDigits(0, 2, progOld[0]);
-                setDigits(0, 3, progOld[1]);
-            }
+            printProg(prog);
         }
         if ((keyValue <= keyNumber9) && (count < 2))
         { // now the actual prog values are read, stored and printed
@@ -1132,7 +1149,7 @@ void processProgramInputMode()
 
 void executeProgramInputMode()
 { // inputting the program
-    setLamp(green, lampProg);
+    setLamp(yellow, lampProg);
     toggleKeyReleaseLamp();
     if (error == 1) {
         flasher();
@@ -1584,6 +1601,7 @@ void actionPlaySelectedAudioclip(int clipnum)
     action = none;
     verb = verbNone;
     noun = nounNone;
+    prog = programNone;
     printVerb(verb);
     printNoun(noun);
     printProg(prog);
@@ -1788,7 +1806,8 @@ void setup()
     // Toggle 
     timer.every(1000, toggle_timer);
     timer.every(600, toggle_timer_600);
-
+    timer.every(100, toggle_timer_250);
+    
     Serial.begin(9600);
     // DFPlayerMini initialize
     mySoftwareSerial.begin(9600);
@@ -1830,40 +1849,76 @@ void setup()
 void loop()
 {
     timer.tick(); // toggle on / off
-    if (toggle == true) {
-        setLamp(white, lampClk);
+    if (toggle == true)
+    {
+        if ((toggle250 == true) && (toggled250 == false))
+        {
+            setLamp(white, lampClk);
+            toggled250 = true;
+        }
+        else if ((toggle250 == false) && (toggled250 == true))
+        {
+            setLamp(off, lampClk);
+        }
     }
     else
     {
-        setLamp(off, lampClk);
+        //setLamp(off, lampClk);
+        if ((toggle250 == true) && (toggled250 == true))
+        {
+            setLamp(white, lampClk);
+            toggled250 = false;
+        }
+        else if ((toggle250 == false) && (toggled250 == false))
+        {
+            setLamp(off, lampClk);
+        }
     }
     
     if (currentProgram == programJFKAudio) {
         //jfk(1);
         playTrack(19);
         currentProgram = programNone;
-        if (currentProgram == 0)
-        {
-            setLamp(off,lampProg);
-        }
+        action = none;
+        verb = verbNone;
+        noun = nounNone;
+        prog = programNone;
+        printVerb(verb);
+        printNoun(noun);
+        printProg(prog);
+        clearRegister(1);
+        clearRegister(2);
+        clearRegister(3);
     }
     else if (currentProgram == programApollo11Audio) {
         //jfk(2);
         playTrack(20);
         currentProgram = programNone;
-        if (currentProgram == 0)
-        {
-            setLamp(off,lampProg);
-        }
+        action = none;
+        verb = verbNone;
+        noun = nounNone;
+        prog = programNone;
+        printVerb(verb);
+        printNoun(noun);
+        printProg(prog);
+        clearRegister(1);
+        clearRegister(2);
+        clearRegister(3);
     }
     else if (currentProgram == programApollo13Audio) {
         //jfk(3);
         playTrack(21);
         currentProgram = programNone;
-        if (currentProgram == 0)
-        {
-            setLamp(off,lampProg);
-        }
+        action = none;
+        verb = verbNone;
+        noun = nounNone;
+        prog = programNone;
+        printVerb(verb);
+        printNoun(noun);
+        printProg(prog);
+        clearRegister(1);
+        clearRegister(2);
+        clearRegister(3);
     }
 
     if (mode == modeIdle) {
